@@ -1,0 +1,51 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: manager-role
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - pods/exec
+  verbs:
+  - create
+  - get
+- apiGroups:
+  - kubeovn.ustc.io
+  resources:
+  - vpcnattunnels
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - kubeovn.ustc.io
+  resources:
+  - vpcnattunnels/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - kubeovn.ustc.io
+  resources:
+  - vpcnattunnels/status
+  verbs:
+  - get
+  - patch
+  - update
