@@ -187,14 +187,26 @@ func (r *VpcNatTunnelReconciler) handleCreateOrUpdate(ctx context.Context, vpcTu
 	if err != nil {
 		return ctrl.Result{}, err
 	}
-	if vpcTunnel.Status.Initialized {
-		//update
-	} else {
+	if !vpcTunnel.Status.Initialized {
+		// add tunnel
 		err := r.execCommandInPod(pod.Name, pod.Namespace, "vpc-nat-gw", genCreateTunnelCmd(vpcTunnel))
 		if err != nil {
 			return ctrl.Result{}, err
 		}
 		vpcTunnel.Status.Initialized = true
+		r.Status().Update(ctx, vpcTunnel)
+	} else if vpcTunnel.Status.Initialized && (vpcTunnel.Status.InternalIP != vpcTunnel.Spec.InternalIP || vpcTunnel.Status.RemoteIP != vpcTunnel.Spec.RemoteIP ||
+		vpcTunnel.Status.InterfaceAddr != vpcTunnel.Spec.InterfaceAddr || vpcTunnel.Status.RemoteInterfaceAddr != vpcTunnel.Spec.RemoteInterfaceAddr ||
+		vpcTunnel.Status.NatGwDp != vpcTunnel.Spec.NatGwDp) {
+		//update
+		err = r.execCommandInPod(pod.Name, pod.Namespace, "vpc-nat-gw", genDeleteTunnelCmd(vpcTunnel))
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		err := r.execCommandInPod(pod.Name, pod.Namespace, "vpc-nat-gw", genCreateTunnelCmd(vpcTunnel))
+		if err != nil {
+			return ctrl.Result{}, err
+		}
 		r.Status().Update(ctx, vpcTunnel)
 	}
 	return ctrl.Result{}, nil

@@ -40,8 +40,12 @@ type VpcNatTunnelSpec struct {
 type VpcNatTunnelStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
-	Initialized bool   `json:"initialized"`
-	Redo        string `json:"redo"`
+	Initialized         bool   `json:"initialized"`
+	InternalIP          string `json:"internalIp"`
+	RemoteIP            string `json:"remoteIp"`
+	InterfaceAddr       string `json:"interfaceAddr"`
+	RemoteInterfaceAddr string `json:"remoteInterfaceAddr"`
+	NatGwDp             string `json:"natGwDp"`
 }
 
 //+kubebuilder:object:root=true
