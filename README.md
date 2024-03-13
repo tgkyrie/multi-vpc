@@ -51,6 +51,7 @@ apiVersion: "kubeovn.ustc.io/v1"
 kind: VpcNatTunnel
 metadata:
   name: ovn-gre0
+  namespace: ns2
 spec:
   internalIp: "172.16.50.84" #vpc网关ip
   remoteIp: "172.16.50.122" #互联的对端vpc网关ip
