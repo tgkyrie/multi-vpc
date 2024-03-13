@@ -17,26 +17,33 @@ limitations under the License.
 package controller
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/remotecommand"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	kubeovnv1 "multi-vpc/api/v1"
+	"multi-vpc/internal/util"
+)
+
+const (
+	vpcGwTunnelFinalizerName = "tunnel.finalizer.ustc.io"
+)
+
+const (
+	natGwTunnelAdd = "tunnel-add"
+	natGwTunnelDel = "tunnel-del"
 )
 
 // VpcNatTunnelReconciler reconciles a VpcNatTunnel object
@@ -69,60 +76,56 @@ func (r *VpcNatTunnelReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	vpcTunnel := &kubeovnv1.VpcNatTunnel{}
 	err := r.Get(ctx, req.NamespacedName, vpcTunnel)
 	if err != nil {
-		log.Log.Error(err, "unable to fetch vpcNatTunnel")
+		// log.Log.Error(err, "unable to fetch vpcNatTunnel")
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 	if !vpcTunnel.ObjectMeta.DeletionTimestamp.IsZero() {
 		return r.handleDelete(ctx, vpcTunnel)
 	}
 	return r.handleCreateOrUpdate(ctx, vpcTunnel)
-
 }
 
-func (r *VpcNatTunnelReconciler) execCommandInPod(podName, namespace, containerName, command string) error {
-	clientset, err := kubernetes.NewForConfig(r.Config)
+func (r *VpcNatTunnelReconciler) handleCreateOrUpdate(ctx context.Context, vpcTunnel *kubeovnv1.VpcNatTunnel) (ctrl.Result, error) {
+	if !util.ContainsString(vpcTunnel.ObjectMeta.Finalizers, vpcGwTunnelFinalizerName) {
+		controllerutil.AddFinalizer(vpcTunnel, vpcGwTunnelFinalizerName)
+		err := r.Update(ctx, vpcTunnel)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+	}
+	pod, err := r.getNatGwPod(vpcTunnel.Spec.NatGwDp)
 	if err != nil {
-		return err
+		return ctrl.Result{}, err
 	}
-	cmd := []string{
-		"sh",
-		"-c",
-		command,
+	log.Log.Info("createOrUpdate vpc gw tunnel")
+	err = r.execNatGwRules(pod.Name, pod.Namespace, "vpc-nat-gw", natGwTunnelAdd, vpcTunnel)
+	if err != nil {
+		return ctrl.Result{}, err
 	}
-	const tty = false
-	req := clientset.CoreV1().RESTClient().Post().
-		Resource("pods").
-		Name(podName).
-		Namespace(namespace).SubResource("exec").Param("container", containerName)
-	req.VersionedParams(
-		&v1.PodExecOptions{
-			Command: cmd,
-			Stdin:   false,
-			Stdout:  true,
-			Stderr:  true,
-			TTY:     tty,
-		},
-		scheme.ParameterCodec,
-	)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	return ctrl.Result{}, nil
+}
 
-	var stdout, stderr bytes.Buffer
-	exec, err := remotecommand.NewSPDYExecutor(r.Config, "POST", req.URL())
-	if err != nil {
-		return err
+func (r *VpcNatTunnelReconciler) handleDelete(ctx context.Context, vpcTunnel *kubeovnv1.VpcNatTunnel) (ctrl.Result, error) {
+	if util.ContainsString(vpcTunnel.ObjectMeta.Finalizers, vpcGwTunnelFinalizerName) {
+		log.Log.Info("delete vpc gw tunnel")
+		pod, err := r.getNatGwPod(vpcTunnel.Spec.NatGwDp)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		err = r.execNatGwRules(pod.Name, pod.Namespace, "vpc-nat-gw", natGwTunnelDel, vpcTunnel)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		controllerutil.RemoveFinalizer(vpcTunnel, vpcGwTunnelFinalizerName)
+		err = r.Update(ctx, vpcTunnel)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
 	}
-	err = exec.StreamWithContext(context.TODO(), remotecommand.StreamOptions{
-		Stdin:  nil,
-		Stdout: &stdout,
-		Stderr: &stderr,
-	})
-	if err != nil {
-		return err
-	}
-	// return strings.TrimSpace(stdout.String()), strings.TrimSpace(stderr.String()), err
-	if strings.TrimSpace(stderr.String()) != "" {
-		return fmt.Errorf(strings.TrimSpace(stderr.String()))
-	}
-	return nil
+	return ctrl.Result{}, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -130,6 +133,11 @@ func (r *VpcNatTunnelReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	r.Config = mgr.GetConfig()
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&kubeovnv1.VpcNatTunnel{}).
+		WithOptions(
+			controller.Options{
+				MaxConcurrentReconciles: 3,
+			},
+		).
 		Complete(r)
 }
 
@@ -163,68 +171,10 @@ func (r *VpcNatTunnelReconciler) getNatGwPod(name string) (*corev1.Pod, error) {
 	return &pods[0], nil
 }
 
-func genCreateTunnelCmd(tunnel *kubeovnv1.VpcNatTunnel) string {
-	createCmd := fmt.Sprintf("ip tunnel add %s mode gre remote %s local %s ttl 255", tunnel.Name, tunnel.Spec.RemoteIP, tunnel.Spec.InternalIP)
-	setUpCmd := fmt.Sprintf("ip link set %s up", tunnel.Name)
-	addrCmd := fmt.Sprintf("ip addr add %s dev %s", tunnel.Spec.InterfaceAddr, tunnel.Name)
-	return createCmd + ";" + setUpCmd + ";" + addrCmd
-}
-
-func genDeleteTunnelCmd(tunnel *kubeovnv1.VpcNatTunnel) string {
-	delCmd := fmt.Sprintf("ip tunnel del %s", tunnel.Name)
-	return delCmd
-}
-
-func (r *VpcNatTunnelReconciler) handleCreateOrUpdate(ctx context.Context, vpcTunnel *kubeovnv1.VpcNatTunnel) (ctrl.Result, error) {
-	if !containsString(vpcTunnel.ObjectMeta.Finalizers, "tunnel.finalizer.ustc.io") {
-		controllerutil.AddFinalizer(vpcTunnel, "tunnel.finalizer.ustc.io")
-		err := r.Update(ctx, vpcTunnel)
-		if err != nil {
-			return ctrl.Result{}, err
-		}
-	}
-	pod, err := r.getNatGwPod(vpcTunnel.Spec.NatGwDp)
-	if err != nil {
-		return ctrl.Result{}, err
-	}
-	if vpcTunnel.Status.Initialized {
-		//update
-	} else {
-		err := r.execCommandInPod(pod.Name, pod.Namespace, "vpc-nat-gw", genCreateTunnelCmd(vpcTunnel))
-		if err != nil {
-			return ctrl.Result{}, err
-		}
-		vpcTunnel.Status.Initialized = true
-		r.Status().Update(ctx, vpcTunnel)
-	}
-	return ctrl.Result{}, nil
-}
-
-func (r *VpcNatTunnelReconciler) handleDelete(ctx context.Context, vpcTunnel *kubeovnv1.VpcNatTunnel) (ctrl.Result, error) {
-	if containsString(vpcTunnel.ObjectMeta.Finalizers, "tunnel.finalizer.ustc.io") {
-		// TODO: implement clean up the GRE tunnel before deletion
-		pod, err := r.getNatGwPod(vpcTunnel.Spec.NatGwDp)
-		if err != nil {
-			return ctrl.Result{}, err
-		}
-		err = r.execCommandInPod(pod.Name, pod.Namespace, "vpc-nat-gw", genDeleteTunnelCmd(vpcTunnel))
-		if err != nil {
-			return ctrl.Result{}, err
-		}
-		controllerutil.RemoveFinalizer(vpcTunnel, "tunnel.finalizer.ustc.io")
-		err = r.Update(ctx, vpcTunnel)
-		if err != nil {
-			return ctrl.Result{}, err
-		}
-	}
-	return ctrl.Result{}, nil
-}
-
-func containsString(slice []string, s string) bool {
-	for _, item := range slice {
-		if item == s {
-			return true
-		}
-	}
-	return false
+func (r *VpcNatTunnelReconciler) execNatGwRules(podName, namespace, containerName, operation string, t *kubeovnv1.VpcNatTunnel) error {
+	rules := []string{}
+	rule := fmt.Sprintf("%s,%s,%s,%s,%s", t.Name, t.Spec.InternalIP, t.Spec.RemoteIP, t.Spec.InterfaceAddr, t.Spec.RemoteInterfaceAddr)
+	rules = append(rules, rule)
+	cmd := fmt.Sprintf("bash /kube-ovn/nat-gateway.sh %s %s", operation, strings.Join(rules, " "))
+	return util.ExecCommandInPod(r.Config, podName, namespace, containerName, cmd)
 }
