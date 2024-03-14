@@ -194,6 +194,11 @@ func (r *VpcNatTunnelReconciler) handleCreateOrUpdate(ctx context.Context, vpcTu
 			return ctrl.Result{}, err
 		}
 		vpcTunnel.Status.Initialized = true
+		vpcTunnel.Status.InternalIP = vpcTunnel.Spec.InternalIP
+		vpcTunnel.Status.RemoteIP = vpcTunnel.Spec.RemoteIP
+		vpcTunnel.Status.InterfaceAddr = vpcTunnel.Spec.InterfaceAddr
+		vpcTunnel.Status.RemoteInterfaceAddr = vpcTunnel.Spec.RemoteInterfaceAddr
+		vpcTunnel.Status.NatGwDp = vpcTunnel.Spec.NatGwDp
 		r.Status().Update(ctx, vpcTunnel)
 	} else if vpcTunnel.Status.Initialized && (vpcTunnel.Status.InternalIP != vpcTunnel.Spec.InternalIP || vpcTunnel.Status.RemoteIP != vpcTunnel.Spec.RemoteIP ||
 		vpcTunnel.Status.InterfaceAddr != vpcTunnel.Spec.InterfaceAddr || vpcTunnel.Status.RemoteInterfaceAddr != vpcTunnel.Spec.RemoteInterfaceAddr ||
@@ -207,6 +212,11 @@ func (r *VpcNatTunnelReconciler) handleCreateOrUpdate(ctx context.Context, vpcTu
 		if err != nil {
 			return ctrl.Result{}, err
 		}
+		vpcTunnel.Status.InternalIP = vpcTunnel.Spec.InternalIP
+		vpcTunnel.Status.RemoteIP = vpcTunnel.Spec.RemoteIP
+		vpcTunnel.Status.InterfaceAddr = vpcTunnel.Spec.InterfaceAddr
+		vpcTunnel.Status.RemoteInterfaceAddr = vpcTunnel.Spec.RemoteInterfaceAddr
+		vpcTunnel.Status.NatGwDp = vpcTunnel.Spec.NatGwDp
 		r.Status().Update(ctx, vpcTunnel)
 	}
 	return ctrl.Result{}, nil
