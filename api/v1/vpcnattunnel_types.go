@@ -29,23 +29,21 @@ type VpcNatTunnelSpec struct {
 	// Important: Run "make" to regenerate code after modifying this file
 
 	// Foo is an example field of VpcNatTunnel. Edit vpcnattunnel_types.go to remove/update
-	InternalIP          string `json:"internalIp"`
-	RemoteIP            string `json:"remoteIp"`
-	InterfaceAddr       string `json:"interfaceAddr"`
-	RemoteInterfaceAddr string `json:"remoteInterfaceAddr"`
-	NatGwDp             string `json:"natGwDp"`
+	InternalIP    string `json:"internalIp"`
+	RemoteIP      string `json:"remoteIp"`
+	InterfaceAddr string `json:"interfaceAddr"`
+	NatGwDp       string `json:"natGwDp"`
 }
 
 // VpcNatTunnelStatus defines the observed state of VpcNatTunnel
 type VpcNatTunnelStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
-	Initialized         bool   `json:"initialized"`
-	InternalIP          string `json:"internalIp"`
-	RemoteIP            string `json:"remoteIp"`
-	InterfaceAddr       string `json:"interfaceAddr"`
-	RemoteInterfaceAddr string `json:"remoteInterfaceAddr"`
-	NatGwDp             string `json:"natGwDp"`
+	Initialized   bool   `json:"initialized"`
+	InternalIP    string `json:"internalIp"`
+	RemoteIP      string `json:"remoteIp"`
+	InterfaceAddr string `json:"interfaceAddr"`
+	NatGwDp       string `json:"natGwDp"`
 }
 
 //+kubebuilder:object:root=true
