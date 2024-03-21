@@ -47,15 +47,12 @@ spec:
                 type: string
               natGwDp:
                 type: string
-              remoteInterfaceAddr:
-                type: string
               remoteIp:
                 type: string
             required:
             - interfaceAddr
             - internalIp
             - natGwDp
-            - remoteInterfaceAddr
             - remoteIp
             type: object
           status:
@@ -72,8 +69,6 @@ spec:
                 type: string
               natGwDp:
                 type: string
-              remoteInterfaceAddr:
-                type: string
               remoteIp:
                 type: string
             required:
@@ -81,7 +76,6 @@ spec:
             - interfaceAddr
             - internalIp
             - natGwDp
-            - remoteInterfaceAddr
             - remoteIp
             type: object
         type: object
