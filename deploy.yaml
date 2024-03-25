@@ -59,15 +59,12 @@ spec:
                 type: string
               natGwDp:
                 type: string
-              remoteInterfaceAddr:
-                type: string
               remoteIp:
                 type: string
             required:
             - interfaceAddr
             - internalIp
             - natGwDp
-            - remoteInterfaceAddr
             - remoteIp
             type: object
           status:
@@ -78,11 +75,20 @@ spec:
                   INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
                   Important: Run "make" to regenerate code after modifying this file
                 type: boolean
-              redo:
+              interfaceAddr:
+                type: string
+              internalIp:
+                type: string
+              natGwDp:
+                type: string
+              remoteIp:
                 type: string
             required:
             - initialized
-            - redo
+            - interfaceAddr
+            - internalIp
+            - natGwDp
+            - remoteIp
             type: object
         type: object
     served: true
@@ -165,6 +171,13 @@ rules:
   - patch
   - update
   - watch
+- apiGroups:
+  - ""
+  resources:
+  - pods/exec
+  verbs:
+  - create
+  - get
 - apiGroups:
   - kubeovn.ustc.io
   resources:
@@ -372,7 +385,7 @@ spec:
         - --leader-elect
         command:
         - /manager
-        image: github.com/tgkyrie/k8splay/tunnel-controller/multivpc:latest
+        image: controller:latest
         livenessProbe:
           httpGet:
             path: /healthz

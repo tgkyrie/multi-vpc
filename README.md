@@ -13,24 +13,26 @@
 **执行以下命令， `IMG`为构建的镜像名:**
 
 ```sh
-export IMG=github.com/tgkyrie/k8splay/tunnel-controller/multivpc:latest
-make docker-build 
+make docker-build # 保存到镜像controller
 ```
 
 
 ### 生成yaml文件
 
 ```sh
-.bin/kustomize-v5.3.0 build config/crd > deploy.yaml
+# cp config/crd/bases/kubeovn.ustc.io_vpcnattunnels.yaml ./deploy.yaml
+bin/kustomize-v5.3.0 build config/default > deploy.yaml
 ```
 
 ### 本地保存镜像文件，远程集群导入镜像文件
 
 本地
 ```sh
-sudo docker tag controller:latest github.com/tgkyrie/k8splay/tunnel-controller/multivpc:latest
+# sudo docker tag controller:latest multivpc:latest
 
-sudo docker save github.com/tgkyrie/k8splay/tunnel-controller/multivpc:latest > myimage.tar
+sudo docker save -o myimage.tar controller:latest
+#sudo docker save github.com/tgkyrie/k8splay/tunnel-controller/multivpc:latest > myimage.tar
+
 ```
 
 k8s集群
