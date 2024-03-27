@@ -23,12 +23,11 @@ import (
 	"strings"
 	"time"
 
-	appsv1 "k8s.io/api/apps/v1"
+	// appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
@@ -172,12 +171,12 @@ func genCreateTunnelCmd(tunnel *kubeovnv1.VpcNatTunnel) string {
 	return createCmd + ";" + setUpCmd + ";" + addrCmd
 }
 
-func genLastCreateTunnelCmd(tunnel *kubeovnv1.VpcNatTunnel) string {
-	createCmd := fmt.Sprintf("ip tunnel add %s mode gre remote %s local %s ttl 255", tunnel.Name, tunnel.Status.RemoteIP, tunnel.Status.InternalIP)
-	setUpCmd := fmt.Sprintf("ip link set %s up", tunnel.Name)
-	addrCmd := fmt.Sprintf("ip addr add %s dev %s", tunnel.Status.InterfaceAddr, tunnel.Name)
-	return createCmd + ";" + setUpCmd + ";" + addrCmd
-}
+// func genLastCreateTunnelCmd(tunnel *kubeovnv1.VpcNatTunnel) string {
+// 	createCmd := fmt.Sprintf("ip tunnel add %s mode gre remote %s local %s ttl 255", tunnel.Name, tunnel.Status.RemoteIP, tunnel.Status.InternalIP)
+// 	setUpCmd := fmt.Sprintf("ip link set %s up", tunnel.Name)
+// 	addrCmd := fmt.Sprintf("ip addr add %s dev %s", tunnel.Status.InterfaceAddr, tunnel.Name)
+// 	return createCmd + ";" + setUpCmd + ";" + addrCmd
+// }
 
 func genDeleteTunnelCmd(tunnel *kubeovnv1.VpcNatTunnel) string {
 	delCmd := fmt.Sprintf("ip tunnel del %s", tunnel.Name)
@@ -194,26 +193,26 @@ func (r *VpcNatTunnelReconciler) handleCreateOrUpdate(ctx context.Context, vpcTu
 	}
 
 	if !vpcTunnel.Status.Initialized {
-		// // add tunnel
-		// podnext, err := r.getNatGwPod(vpcTunnel.Spec.NatGwDp) // find pod named Spec.NatGwDp
-		// if err != nil {
-		// 	return ctrl.Result{}, err
-		// }
-		// err = r.execCommandInPod(podnext.Name, podnext.Namespace, "vpc-nat-gw", genCreateTunnelCmd(vpcTunnel))
-		// if err != nil {
-		// 	return ctrl.Result{}, err
-		// }
-
-		statefulSet := &appsv1.StatefulSet{}
-		err := r.Get(ctx, types.NamespacedName{Name: "vpc-nat-gw-" + vpcTunnel.Spec.NatGwDp, Namespace: "kube-system"}, statefulSet) // get StatefulSet named Spec.NatGwDp
+		// add tunnel
+		podnext, err := r.getNatGwPod(vpcTunnel.Spec.NatGwDp) // find pod named Spec.NatGwDp
 		if err != nil {
 			return ctrl.Result{}, err
 		}
-		// get StatefulSet Containers command  at the begin is "while true; do sleep 10000; done"
-		oldRestartCommand := statefulSet.Spec.Template.Spec.Containers[0].Args[1]
-		// insert create tunnel command at head  in statefulSet Containers
-		newRestartCommand := genCreateTunnelCmd(vpcTunnel) + oldRestartCommand
-		statefulSet.Spec.Template.Spec.Containers[0].Args[1] = newRestartCommand
+		err = r.execCommandInPod(podnext.Name, podnext.Namespace, "vpc-nat-gw", genCreateTunnelCmd(vpcTunnel))
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+
+		// statefulSet := &appsv1.StatefulSet{}
+		// err = r.Get(ctx, types.NamespacedName{Name: "vpc-nat-gw-" + vpcTunnel.Spec.NatGwDp, Namespace: "kube-system"}, statefulSet) // get StatefulSet named Spec.NatGwDp
+		// if err != nil {
+		// 	return ctrl.Result{}, err
+		// }
+		// // get StatefulSet Containers command  at the begin is "while true; do sleep 10000; done"
+		// oldRestartCommand := statefulSet.Spec.Template.Spec.Containers[0].Args[1]
+		// // insert create tunnel command at head  in statefulSet Containers
+		// newRestartCommand := genCreateTunnelCmd(vpcTunnel) + oldRestartCommand
+		// statefulSet.Spec.Template.Spec.Containers[0].Args[1] = newRestartCommand
 
 		vpcTunnel.Status.Initialized = true
 		vpcTunnel.Status.InternalIP = vpcTunnel.Spec.InternalIP
@@ -225,73 +224,73 @@ func (r *VpcNatTunnelReconciler) handleCreateOrUpdate(ctx context.Context, vpcTu
 	} else if vpcTunnel.Status.Initialized && (vpcTunnel.Status.InternalIP != vpcTunnel.Spec.InternalIP || vpcTunnel.Status.RemoteIP != vpcTunnel.Spec.RemoteIP ||
 		vpcTunnel.Status.InterfaceAddr != vpcTunnel.Spec.InterfaceAddr || vpcTunnel.Status.NatGwDp != vpcTunnel.Spec.NatGwDp) {
 		if vpcTunnel.Status.NatGwDp == vpcTunnel.Spec.NatGwDp {
-			// podnext, err := r.getNatGwPod(vpcTunnel.Spec.NatGwDp) // find pod named Spec.NatGwDp
-			// if err != nil {
-			// 	return ctrl.Result{}, err
-			// }
-			// err = r.execCommandInPod(podnext.Name, podnext.Namespace, "vpc-nat-gw", genDeleteTunnelCmd(vpcTunnel))
-			// if err != nil {
-			// 	return ctrl.Result{}, err
-			// }
-			// err = r.execCommandInPod(podnext.Name, podnext.Namespace, "vpc-nat-gw", genCreateTunnelCmd(vpcTunnel))
-			// if err != nil {
-			// 	return ctrl.Result{}, err
-			// }
-
-			statefulSet := &appsv1.StatefulSet{}
-			err := r.Get(ctx, types.NamespacedName{Name: "vpc-nat-gw-" + vpcTunnel.Status.NatGwDp, Namespace: "kube-system"}, statefulSet) // get StatefulSet named Status.NatGwDp
+			podnext, err := r.getNatGwPod(vpcTunnel.Spec.NatGwDp) // find pod named Spec.NatGwDp
 			if err != nil {
 				return ctrl.Result{}, err
 			}
-			// get StatefulSet Containers command  at the begin is "while true; do sleep 10000; done"
-			oldRestartCommand := statefulSet.Spec.Template.Spec.Containers[0].Args[1]
-			// delete create tunnel command  in statefulSet Containers
-			comd := genLastCreateTunnelCmd(vpcTunnel)
-			index := strings.Index(oldRestartCommand, comd)
-			newRestartCommand := genCreateTunnelCmd(vpcTunnel) + oldRestartCommand[:index] + oldRestartCommand[index+len(comd):]
-			statefulSet.Spec.Template.Spec.Containers[0].Args[1] = newRestartCommand
+			err = r.execCommandInPod(podnext.Name, podnext.Namespace, "vpc-nat-gw", genDeleteTunnelCmd(vpcTunnel))
+			if err != nil {
+				return ctrl.Result{}, err
+			}
+			err = r.execCommandInPod(podnext.Name, podnext.Namespace, "vpc-nat-gw", genCreateTunnelCmd(vpcTunnel))
+			if err != nil {
+				return ctrl.Result{}, err
+			}
+
+			// statefulSet := &appsv1.StatefulSet{}
+			// err := r.Get(ctx, types.NamespacedName{Name: "vpc-nat-gw-" + vpcTunnel.Status.NatGwDp, Namespace: "kube-system"}, statefulSet) // get StatefulSet named Status.NatGwDp
+			// if err != nil {
+			// 	return ctrl.Result{}, err
+			// }
+			// // get StatefulSet Containers command  at the begin is "while true; do sleep 10000; done"
+			// oldRestartCommand := statefulSet.Spec.Template.Spec.Containers[0].Args[1]
+			// // delete create tunnel command  in statefulSet Containers
+			// comd := genLastCreateTunnelCmd(vpcTunnel)
+			// index := strings.Index(oldRestartCommand, comd)
+			// newRestartCommand := genCreateTunnelCmd(vpcTunnel) + oldRestartCommand[:index] + oldRestartCommand[index+len(comd):]
+			// statefulSet.Spec.Template.Spec.Containers[0].Args[1] = newRestartCommand
 
 		} else { // change the gw pod
-			// // update
-			// podlast, err := r.getNatGwPod(vpcTunnel.Status.NatGwDp) // find pod named Status.NatGwDp
-			// if err != nil {
-			// 	return ctrl.Result{}, err
-			// }
-			// err = r.execCommandInPod(podlast.Name, podlast.Namespace, "vpc-nat-gw", genDeleteTunnelCmd(vpcTunnel))
-			// if err != nil {
-			// 	return ctrl.Result{}, err
-			// }
-			// podnext, err := r.getNatGwPod(vpcTunnel.Spec.NatGwDp) // find pod named Status.NatGwDp
-			// if err != nil {
-			// 	return ctrl.Result{}, err
-			// }
-			// err = r.execCommandInPod(podnext.Name, podnext.Namespace, "vpc-nat-gw", genCreateTunnelCmd(vpcTunnel))
-			// if err != nil {
-			// 	return ctrl.Result{}, err
-			// }
-
-			statefulSet := &appsv1.StatefulSet{}
-			err := r.Get(ctx, types.NamespacedName{Name: "vpc-nat-gw-" + vpcTunnel.Status.NatGwDp, Namespace: "kube-system"}, statefulSet) // get StatefulSet named Status.NatGwDp
+			// update
+			podlast, err := r.getNatGwPod(vpcTunnel.Status.NatGwDp) // find pod named Status.NatGwDp
 			if err != nil {
 				return ctrl.Result{}, err
 			}
-			// get StatefulSet Containers command  at the begin is "while true; do sleep 10000; done"
-			oldRestartCommand := statefulSet.Spec.Template.Spec.Containers[0].Args[1]
-			// delete create tunnel command  in statefulSet Containers
-			comd := genLastCreateTunnelCmd(vpcTunnel)
-			index := strings.Index(oldRestartCommand, comd)
-			newRestartCommand := oldRestartCommand[:index] + oldRestartCommand[index+len(comd):]
-			statefulSet.Spec.Template.Spec.Containers[0].Args[1] = newRestartCommand
-
-			statefulSet = &appsv1.StatefulSet{}
-			err = r.Get(ctx, types.NamespacedName{Name: "vpc-nat-gw-" + vpcTunnel.Spec.NatGwDp, Namespace: "kube-system"}, statefulSet) // get StatefulSet named Spec.NatGwDp
+			err = r.execCommandInPod(podlast.Name, podlast.Namespace, "vpc-nat-gw", genDeleteTunnelCmd(vpcTunnel))
 			if err != nil {
 				return ctrl.Result{}, err
 			}
-			oldRestartCommand = statefulSet.Spec.Template.Spec.Containers[0].Args[1]
-			// insert create tunnel command at head  in statefulSet Containers
-			newRestartCommand = genCreateTunnelCmd(vpcTunnel) + oldRestartCommand
-			statefulSet.Spec.Template.Spec.Containers[0].Args[1] = newRestartCommand
+			podnext, err := r.getNatGwPod(vpcTunnel.Spec.NatGwDp) // find pod named Status.NatGwDp
+			if err != nil {
+				return ctrl.Result{}, err
+			}
+			err = r.execCommandInPod(podnext.Name, podnext.Namespace, "vpc-nat-gw", genCreateTunnelCmd(vpcTunnel))
+			if err != nil {
+				return ctrl.Result{}, err
+			}
+
+			// statefulSet := &appsv1.StatefulSet{}
+			// err := r.Get(ctx, types.NamespacedName{Name: "vpc-nat-gw-" + vpcTunnel.Status.NatGwDp, Namespace: "kube-system"}, statefulSet) // get StatefulSet named Status.NatGwDp
+			// if err != nil {
+			// 	return ctrl.Result{}, err
+			// }
+			// // get StatefulSet Containers command  at the begin is "while true; do sleep 10000; done"
+			// oldRestartCommand := statefulSet.Spec.Template.Spec.Containers[0].Args[1]
+			// // delete create tunnel command  in statefulSet Containers
+			// comd := genLastCreateTunnelCmd(vpcTunnel)
+			// index := strings.Index(oldRestartCommand, comd)
+			// newRestartCommand := oldRestartCommand[:index] + oldRestartCommand[index+len(comd):]
+			// statefulSet.Spec.Template.Spec.Containers[0].Args[1] = newRestartCommand
+
+			// statefulSet = &appsv1.StatefulSet{}
+			// err = r.Get(ctx, types.NamespacedName{Name: "vpc-nat-gw-" + vpcTunnel.Spec.NatGwDp, Namespace: "kube-system"}, statefulSet) // get StatefulSet named Spec.NatGwDp
+			// if err != nil {
+			// 	return ctrl.Result{}, err
+			// }
+			// oldRestartCommand = statefulSet.Spec.Template.Spec.Containers[0].Args[1]
+			// // insert create tunnel command at head  in statefulSet Containers
+			// newRestartCommand = genCreateTunnelCmd(vpcTunnel) + oldRestartCommand
+			// statefulSet.Spec.Template.Spec.Containers[0].Args[1] = newRestartCommand
 
 			vpcTunnel.Status.InternalIP = vpcTunnel.Spec.InternalIP
 			vpcTunnel.Status.RemoteIP = vpcTunnel.Spec.RemoteIP
@@ -306,27 +305,27 @@ func (r *VpcNatTunnelReconciler) handleCreateOrUpdate(ctx context.Context, vpcTu
 func (r *VpcNatTunnelReconciler) handleDelete(ctx context.Context, vpcTunnel *kubeovnv1.VpcNatTunnel) (ctrl.Result, error) {
 	if containsString(vpcTunnel.ObjectMeta.Finalizers, "tunnel.finalizer.ustc.io") {
 		// TODO: implement clean up the GRE tunnel before deletion
-		// pod, err := r.getNatGwPod(vpcTunnel.Spec.NatGwDp)
-		// if err != nil {
-		// 	return ctrl.Result{}, err
-		// }
-		// err = r.execCommandInPod(pod.Name, pod.Namespace, "vpc-nat-gw", genDeleteTunnelCmd(vpcTunnel))
-		// if err != nil {
-		// 	return ctrl.Result{}, err
-		// }
-
-		statefulSet := &appsv1.StatefulSet{}
-		err := r.Get(ctx, types.NamespacedName{Name: "vpc-nat-gw-" + vpcTunnel.Spec.NatGwDp, Namespace: "kube-system"}, statefulSet) // get StatefulSet named Status.NatGwDp
+		pod, err := r.getNatGwPod(vpcTunnel.Spec.NatGwDp)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
-		// get StatefulSet Containers command  at the begin is "while true; do sleep 10000; done"
-		oldRestartCommand := statefulSet.Spec.Template.Spec.Containers[0].Args[1]
-		// delete create tunnel command  in statefulSet Containers
-		comd := genLastCreateTunnelCmd(vpcTunnel)
-		index := strings.Index(oldRestartCommand, comd)
-		newRestartCommand := oldRestartCommand[:index] + oldRestartCommand[index+len(comd):]
-		statefulSet.Spec.Template.Spec.Containers[0].Args[1] = newRestartCommand
+		err = r.execCommandInPod(pod.Name, pod.Namespace, "vpc-nat-gw", genDeleteTunnelCmd(vpcTunnel))
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+
+		// statefulSet := &appsv1.StatefulSet{}
+		// err := r.Get(ctx, types.NamespacedName{Name: "vpc-nat-gw-" + vpcTunnel.Spec.NatGwDp, Namespace: "kube-system"}, statefulSet) // get StatefulSet named Status.NatGwDp
+		// if err != nil {
+		// 	return ctrl.Result{}, err
+		// }
+		// // get StatefulSet Containers command  at the begin is "while true; do sleep 10000; done"
+		// oldRestartCommand := statefulSet.Spec.Template.Spec.Containers[0].Args[1]
+		// // delete create tunnel command  in statefulSet Containers
+		// comd := genLastCreateTunnelCmd(vpcTunnel)
+		// index := strings.Index(oldRestartCommand, comd)
+		// newRestartCommand := oldRestartCommand[:index] + oldRestartCommand[index+len(comd):]
+		// statefulSet.Spec.Template.Spec.Containers[0].Args[1] = newRestartCommand
 
 		controllerutil.RemoveFinalizer(vpcTunnel, "tunnel.finalizer.ustc.io")
 		err = r.Update(ctx, vpcTunnel)
