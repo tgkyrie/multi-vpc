@@ -385,7 +385,7 @@ spec:
         - --leader-elect
         command:
         - /manager
-        image: github.com/shenzuzhenwang/multi-vpc/multivpc:latest
+        image: shenzuzhenwang/multivpc:latest
         livenessProbe:
           httpGet:
             path: /healthz

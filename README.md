@@ -15,7 +15,8 @@
 将makefile中的IMG改为镜像地址
 
 ```sh
-make docker-build
+make docker-build 
+# 或make docker-build docker-push到远程仓库
 ```
 
 ### 生成yaml文件
@@ -28,6 +29,8 @@ make deploy
 
 ### 本地保存镜像文件，远程集群导入镜像文件
 
+也可直接从远程仓库pull
+
 本地
 ```sh
 sudo docker save -o myimage.tar github.com/shenzuzhenwang/multi-vpc/multivpc:latest
@@ -39,6 +42,9 @@ sudo ctr -n k8s.io image import myimage.tar
 ```
 
 ### k8s集群部署
+
+本地镜像，需要更改imagePullPolicy: IfNotPresent
+
 ```sh
 kubectl apply -f deploy.yaml
 ```
