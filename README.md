@@ -12,27 +12,25 @@
 ### 构建镜像
 **执行以下命令， `IMG`为构建的镜像名:**
 
-```sh
-make docker-build # 保存到镜像controller
-```
+将makefile中的IMG改为镜像地址
 
+```sh
+make docker-build
+```
 
 ### 生成yaml文件
 
+更改了makefile中的deploy
+
 ```sh
-# cp config/crd/bases/kubeovn.ustc.io_vpcnattunnels.yaml ./deploy.yaml
-bin/kustomize-v5.3.0 build config/default > deploy.yaml
+make deploy
 ```
 
 ### 本地保存镜像文件，远程集群导入镜像文件
 
 本地
 ```sh
-# sudo docker tag controller:latest multivpc:latest
-
-sudo docker save -o myimage.tar controller:latest
-#sudo docker save github.com/tgkyrie/k8splay/tunnel-controller/multivpc:latest > myimage.tar
-
+sudo docker save -o myimage.tar github.com/shenzuzhenwang/multi-vpc/multivpc:latest
 ```
 
 k8s集群
@@ -58,7 +56,6 @@ spec:
   internalIp: "172.16.50.84" #vpc网关ip
   remoteIp: "172.16.50.122" #互联的对端vpc网关ip
   interfaceAddr: "10.0.0.1/24" #隧道地址
-  remoteInterfaceAddr: "10.0.0.2/24" #对端隧道地址
   natGwDp: "vpc2-net1-gateway" #vpc网关名字
 
 ```

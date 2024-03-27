@@ -82,20 +82,9 @@ spec:
               natGwDp:
                 type: string
               remoteIp:
-              interfaceAddr:
-                type: string
-              internalIp:
-                type: string
-              natGwDp:
-                type: string
-              remoteIp:
                 type: string
             required:
             - initialized
-            - interfaceAddr
-            - internalIp
-            - natGwDp
-            - remoteIp
             - interfaceAddr
             - internalIp
             - natGwDp
@@ -396,7 +385,7 @@ spec:
         - --leader-elect
         command:
         - /manager
-        image: controller:latest
+        image: github.com/shenzuzhenwang/multi-vpc/multivpc:latest
         livenessProbe:
           httpGet:
             path: /healthz
