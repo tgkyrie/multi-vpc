@@ -14,6 +14,7 @@
 
 ```sh
 make docker-build # 保存到镜像controller
+make docker-build # 保存到镜像controller
 ```
 
 
