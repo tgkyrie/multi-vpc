@@ -1,0 +1,12 @@
+apiVersion: test.my.domain/v1
+kind: VpcConnection
+metadata:
+  labels:
+    app.kubernetes.io/name: vpcconnection
+    app.kubernetes.io/instance: vpcconnection-sample
+    app.kubernetes.io/part-of: vpcconnection
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: vpcconnection
+  name: vpcconnection-sample
+spec:
+  # TODO(user): Add fields here

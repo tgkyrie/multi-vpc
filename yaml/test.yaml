@@ -1,0 +1,10 @@
+apiVersion: test.my.domain/v1
+kind: VpcConnection
+metadata:
+  name: connection-1
+spec:
+  vpc: vpc2
+  gateway: gw2
+  cidr: "11.0.1.0/24"
+  ip: "11.0.1.254"
+  operation: Stop

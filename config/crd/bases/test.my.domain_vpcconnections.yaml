@@ -4,20 +4,20 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.14.0
-  name: vpcnattunnels.kubeovn.ustc.io
+  name: vpcconnections.test.my.domain
 spec:
-  group: kubeovn.ustc.io
+  group: test.my.domain
   names:
-    kind: VpcNatTunnel
-    listKind: VpcNatTunnelList
-    plural: vpcnattunnels
-    singular: vpcnattunnel
-  scope: Namespaced
+    kind: VpcConnection
+    listKind: VpcConnectionList
+    plural: vpcconnections
+    singular: vpcconnection
+  scope: Cluster
   versions:
   - name: v1
     schema:
       openAPIV3Schema:
-        description: VpcNatTunnel is the Schema for the vpcnattunnels API
+        description: VpcConnection is the Schema for the vpcconnections API
         properties:
           apiVersion:
             description: |-
@@ -37,43 +37,25 @@ spec:
           metadata:
             type: object
           spec:
-            description: VpcNatTunnelSpec defines the desired state of VpcNatTunnel
+            description: VpcConnectionSpec defines the desired state of VpcConnection
             properties:
-              interfaceAddr:
+              cidr:
                 type: string
-              internalIp:
-                description: Foo is an example field of VpcNatTunnel. Edit vpcnattunnel_types.go
-                  to remove/update
+              gateway:
                 type: string
-              natGwDp:
+              ip:
                 type: string
-              remoteInterfaceAddr:
+              operation:
                 type: string
-              remoteIp:
+              vpc:
                 type: string
-            required:
-            - interfaceAddr
-            - internalIp
-            - natGwDp
-            - remoteInterfaceAddr
-            - remoteIp
             type: object
           status:
-            description: VpcNatTunnelStatus defines the observed state of VpcNatTunnel
+            description: VpcConnectionStatus defines the observed state of VpcConnection
             properties:
-              initialized:
-                description: |-
-                  INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-                  Important: Run "make" to regenerate code after modifying this file
-                type: boolean
-              redo:
+              state:
                 type: string
-            required:
-            - initialized
-            - redo
             type: object
         type: object
     served: true
     storage: true
-    subresources:
-      status: {}

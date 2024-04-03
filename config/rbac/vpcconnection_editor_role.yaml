@@ -1,20 +1,20 @@
-# permissions for end users to edit vpcnattunnels.
+# permissions for end users to edit vpcconnections.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   labels:
     app.kubernetes.io/name: clusterrole
-    app.kubernetes.io/instance: vpcnattunnel-editor-role
+    app.kubernetes.io/instance: vpcconnection-editor-role
     app.kubernetes.io/component: rbac
-    app.kubernetes.io/created-by: multi-vpc
-    app.kubernetes.io/part-of: multi-vpc
+    app.kubernetes.io/created-by: vpcconnection
+    app.kubernetes.io/part-of: vpcconnection
     app.kubernetes.io/managed-by: kustomize
-  name: vpcnattunnel-editor-role
+  name: vpcconnection-editor-role
 rules:
 - apiGroups:
-  - kubeovn.ustc.io
+  - test.my.domain
   resources:
-  - vpcnattunnels
+  - vpcconnections
   verbs:
   - create
   - delete
@@ -24,8 +24,8 @@ rules:
   - update
   - watch
 - apiGroups:
-  - kubeovn.ustc.io
+  - test.my.domain
   resources:
-  - vpcnattunnels/status
+  - vpcconnections/status
   verbs:
   - get

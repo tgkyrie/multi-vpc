@@ -1,4 +1,4 @@
 ## Append samples of your project ##
 resources:
-- kubeovn_v1_vpcnattunnel.yaml
+- test_v1_vpcconnection.yaml
 #+kubebuilder:scaffold:manifestskustomizesamples

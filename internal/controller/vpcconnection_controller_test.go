@@ -27,10 +27,10 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	kubeovnv1 "multi-vpc/api/v1"
+	testv1 "VpcConnection/api/v1"
 )
 
-var _ = Describe("VpcNatTunnel Controller", func() {
+var _ = Describe("VpcConnection Controller", func() {
 	Context("When reconciling a resource", func() {
 		const resourceName = "test-resource"
 
@@ -40,13 +40,13 @@ var _ = Describe("VpcNatTunnel Controller", func() {
 			Name:      resourceName,
 			Namespace: "default", // TODO(user):Modify as needed
 		}
-		vpcnattunnel := &kubeovnv1.VpcNatTunnel{}
+		vpcconnection := &testv1.VpcConnection{}
 
 		BeforeEach(func() {
-			By("creating the custom resource for the Kind VpcNatTunnel")
-			err := k8sClient.Get(ctx, typeNamespacedName, vpcnattunnel)
+			By("creating the custom resource for the Kind VpcConnection")
+			err := k8sClient.Get(ctx, typeNamespacedName, vpcconnection)
 			if err != nil && errors.IsNotFound(err) {
-				resource := &kubeovnv1.VpcNatTunnel{
+				resource := &testv1.VpcConnection{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      resourceName,
 						Namespace: "default",
@@ -59,16 +59,16 @@ var _ = Describe("VpcNatTunnel Controller", func() {
 
 		AfterEach(func() {
 			// TODO(user): Cleanup logic after each test, like removing the resource instance.
-			resource := &kubeovnv1.VpcNatTunnel{}
+			resource := &testv1.VpcConnection{}
 			err := k8sClient.Get(ctx, typeNamespacedName, resource)
 			Expect(err).NotTo(HaveOccurred())
 
-			By("Cleanup the specific resource instance VpcNatTunnel")
+			By("Cleanup the specific resource instance VpcConnection")
 			Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
 		})
 		It("should successfully reconcile the resource", func() {
 			By("Reconciling the created resource")
-			controllerReconciler := &VpcNatTunnelReconciler{
+			controllerReconciler := &VpcConnectionReconciler{
 				Client: k8sClient,
 				Scheme: k8sClient.Scheme(),
 			}
