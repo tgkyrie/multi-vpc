@@ -2,7 +2,7 @@
 # This file is used to track the info used to scaffold your project
 # and allow the plugins properly work.
 # More info: https://book.kubebuilder.io/reference/project-config.html
-domain: ustc.io
+domain: my.domain
 layout:
 - go.kubebuilder.io/v4
 projectName: multi-vpc
@@ -12,9 +12,9 @@ resources:
     crdVersion: v1
     namespaced: true
   controller: true
-  domain: ustc.io
-  group: kubeovn
-  kind: VpcNatTunnel
+  domain: my.domain
+  group: kubeovn.ustc.io
+  kind: VpcDns
   path: multi-vpc/api/v1
   version: v1
 version: "3"

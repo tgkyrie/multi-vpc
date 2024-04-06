@@ -26,69 +26,75 @@ spec:
     singular: vpcnattunnel
   scope: Namespaced
   versions:
-  - name: v1
-    schema:
-      openAPIV3Schema:
-        description: VpcNatTunnel is the Schema for the vpcnattunnels API
-        properties:
-          apiVersion:
-            description: |-
-              APIVersion defines the versioned schema of this representation of an object.
-              Servers should convert recognized schemas to the latest internal value, and
-              may reject unrecognized values.
-              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
-            type: string
-          kind:
-            description: |-
-              Kind is a string value representing the REST resource this object represents.
-              Servers may infer this from the endpoint the client submits requests to.
-              Cannot be updated.
-              In CamelCase.
-              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
-            type: string
-          metadata:
-            type: object
-          spec:
-            description: VpcNatTunnelSpec defines the desired state of VpcNatTunnel
-            properties:
-              interfaceAddr:
-                type: string
-              internalIp:
-                description: Foo is an example field of VpcNatTunnel. Edit vpcnattunnel_types.go
-                  to remove/update
-                type: string
-              natGwDp:
-                type: string
-              remoteInterfaceAddr:
-                type: string
-              remoteIp:
-                type: string
-            required:
-            - interfaceAddr
-            - internalIp
-            - natGwDp
-            - remoteInterfaceAddr
-            - remoteIp
-            type: object
-          status:
-            description: VpcNatTunnelStatus defines the observed state of VpcNatTunnel
-            properties:
-              initialized:
-                description: |-
-                  INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-                  Important: Run "make" to regenerate code after modifying this file
-                type: boolean
-              redo:
-                type: string
-            required:
-            - initialized
-            - redo
-            type: object
-        type: object
-    served: true
-    storage: true
-    subresources:
-      status: {}
+    - name: v1
+      schema:
+        openAPIV3Schema:
+          description: VpcNatTunnel is the Schema for the vpcnattunnels API
+          properties:
+            apiVersion:
+              description: |-
+                APIVersion defines the versioned schema of this representation of an object.
+                Servers should convert recognized schemas to the latest internal value, and
+                may reject unrecognized values.
+                More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+              type: string
+            kind:
+              description: |-
+                Kind is a string value representing the REST resource this object represents.
+                Servers may infer this from the endpoint the client submits requests to.
+                Cannot be updated.
+                In CamelCase.
+                More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+              type: string
+            metadata:
+              type: object
+            spec:
+              description: VpcNatTunnelSpec defines the desired state of VpcNatTunnel
+              properties:
+                interfaceAddr:
+                  type: string
+                internalIp:
+                  description: Foo is an example field of VpcNatTunnel. Edit vpcnattunnel_types.go
+                    to remove/update
+                  type: string
+                natGwDp:
+                  type: string
+                remoteIp:
+                  type: string
+              required:
+                - interfaceAddr
+                - internalIp
+                - natGwDp
+                - remoteIp
+              type: object
+            status:
+              description: VpcNatTunnelStatus defines the observed state of VpcNatTunnel
+              properties:
+                initialized:
+                  description: |-
+                    INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
+                    Important: Run "make" to regenerate code after modifying this file
+                  type: boolean
+                interfaceAddr:
+                  type: string
+                internalIp:
+                  type: string
+                natGwDp:
+                  type: string
+                remoteIp:
+                  type: string
+              required:
+                - initialized
+                - interfaceAddr
+                - internalIp
+                - natGwDp
+                - remoteIp
+              type: object
+          type: object
+      served: true
+      storage: true
+      subresources:
+        status: {}
 ---
 apiVersion: v1
 kind: ServiceAccount
@@ -116,81 +122,88 @@ metadata:
   name: multi-vpc-leader-election-role
   namespace: multi-vpc-system
 rules:
-- apiGroups:
-  - ""
-  resources:
-  - configmaps
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-  - patch
-  - delete
-- apiGroups:
-  - coordination.k8s.io
-  resources:
-  - leases
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-  - patch
-  - delete
-- apiGroups:
-  - ""
-  resources:
-  - events
-  verbs:
-  - create
-  - patch
+  - apiGroups:
+      - ""
+    resources:
+      - configmaps
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+      - patch
+      - delete
+  - apiGroups:
+      - coordination.k8s.io
+    resources:
+      - leases
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+      - patch
+      - delete
+  - apiGroups:
+      - ""
+    resources:
+      - events
+    verbs:
+      - create
+      - patch
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   name: multi-vpc-manager-role
 rules:
-- apiGroups:
-  - ""
-  resources:
-  - pods
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - kubeovn.ustc.io
-  resources:
-  - vpcnattunnels
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - kubeovn.ustc.io
-  resources:
-  - vpcnattunnels/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - kubeovn.ustc.io
-  resources:
-  - vpcnattunnels/status
-  verbs:
-  - get
-  - patch
-  - update
+  - apiGroups:
+      - ""
+    resources:
+      - pods
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - ""
+    resources:
+      - pods/exec
+    verbs:
+      - create
+      - get
+  - apiGroups:
+      - kubeovn.ustc.io
+    resources:
+      - vpcnattunnels
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - kubeovn.ustc.io
+    resources:
+      - vpcnattunnels/finalizers
+    verbs:
+      - update
+  - apiGroups:
+      - kubeovn.ustc.io
+    resources:
+      - vpcnattunnels/status
+    verbs:
+      - get
+      - patch
+      - update
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -204,10 +217,10 @@ metadata:
     app.kubernetes.io/part-of: multi-vpc
   name: multi-vpc-metrics-reader
 rules:
-- nonResourceURLs:
-  - /metrics
-  verbs:
-  - get
+  - nonResourceURLs:
+      - /metrics
+    verbs:
+      - get
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -221,18 +234,18 @@ metadata:
     app.kubernetes.io/part-of: multi-vpc
   name: multi-vpc-proxy-role
 rules:
-- apiGroups:
-  - authentication.k8s.io
-  resources:
-  - tokenreviews
-  verbs:
-  - create
-- apiGroups:
-  - authorization.k8s.io
-  resources:
-  - subjectaccessreviews
-  verbs:
-  - create
+  - apiGroups:
+      - authentication.k8s.io
+    resources:
+      - tokenreviews
+    verbs:
+      - create
+  - apiGroups:
+      - authorization.k8s.io
+    resources:
+      - subjectaccessreviews
+    verbs:
+      - create
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
@@ -251,9 +264,9 @@ roleRef:
   kind: Role
   name: multi-vpc-leader-election-role
 subjects:
-- kind: ServiceAccount
-  name: multi-vpc-controller-manager
-  namespace: multi-vpc-system
+  - kind: ServiceAccount
+    name: multi-vpc-controller-manager
+    namespace: multi-vpc-system
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -271,9 +284,9 @@ roleRef:
   kind: ClusterRole
   name: multi-vpc-manager-role
 subjects:
-- kind: ServiceAccount
-  name: multi-vpc-controller-manager
-  namespace: multi-vpc-system
+  - kind: ServiceAccount
+    name: multi-vpc-controller-manager
+    namespace: multi-vpc-system
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -291,9 +304,9 @@ roleRef:
   kind: ClusterRole
   name: multi-vpc-proxy-role
 subjects:
-- kind: ServiceAccount
-  name: multi-vpc-controller-manager
-  namespace: multi-vpc-system
+  - kind: ServiceAccount
+    name: multi-vpc-controller-manager
+    namespace: multi-vpc-system
 ---
 apiVersion: v1
 kind: Service
@@ -310,10 +323,10 @@ metadata:
   namespace: multi-vpc-system
 spec:
   ports:
-  - name: https
-    port: 8443
-    protocol: TCP
-    targetPort: https
+    - name: https
+      port: 8443
+      protocol: TCP
+      targetPort: https
   selector:
     control-plane: controller-manager
 ---
@@ -343,61 +356,61 @@ spec:
         control-plane: controller-manager
     spec:
       containers:
-      - args:
-        - --secure-listen-address=0.0.0.0:8443
-        - --upstream=http://127.0.0.1:8080/
-        - --logtostderr=true
-        - --v=0
-        image: gcr.io/kubebuilder/kube-rbac-proxy:v0.15.0
-        name: kube-rbac-proxy
-        ports:
-        - containerPort: 8443
-          name: https
-          protocol: TCP
-        resources:
-          limits:
-            cpu: 500m
-            memory: 128Mi
-          requests:
-            cpu: 5m
-            memory: 64Mi
-        securityContext:
-          allowPrivilegeEscalation: false
-          capabilities:
-            drop:
-            - ALL
-      - args:
-        - --health-probe-bind-address=:8081
-        - --metrics-bind-address=127.0.0.1:8080
-        - --leader-elect
-        command:
-        - /manager
-        image: github.com/tgkyrie/k8splay/tunnel-controller/multivpc:latest
-        livenessProbe:
-          httpGet:
-            path: /healthz
-            port: 8081
-          initialDelaySeconds: 15
-          periodSeconds: 20
-        name: manager
-        readinessProbe:
-          httpGet:
-            path: /readyz
-            port: 8081
-          initialDelaySeconds: 5
-          periodSeconds: 10
-        resources:
-          limits:
-            cpu: 500m
-            memory: 128Mi
-          requests:
-            cpu: 10m
-            memory: 64Mi
-        securityContext:
-          allowPrivilegeEscalation: false
-          capabilities:
-            drop:
-            - ALL
+        - args:
+            - --secure-listen-address=0.0.0.0:8443
+            - --upstream=http://127.0.0.1:8080/
+            - --logtostderr=true
+            - --v=0
+          image: gcr.io/kubebuilder/kube-rbac-proxy:v0.15.0
+          name: kube-rbac-proxy
+          ports:
+            - containerPort: 8443
+              name: https
+              protocol: TCP
+          resources:
+            limits:
+              cpu: 500m
+              memory: 128Mi
+            requests:
+              cpu: 5m
+              memory: 64Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+        - args:
+            - --health-probe-bind-address=:8081
+            - --metrics-bind-address=127.0.0.1:8080
+            - --leader-elect
+          command:
+            - /manager
+          image: shenzuzhenwang/multivpc:latest
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8081
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          name: manager
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8081
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            limits:
+              cpu: 500m
+              memory: 128Mi
+            requests:
+              cpu: 10m
+              memory: 64Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
       securityContext:
         runAsNonRoot: true
       serviceAccountName: multi-vpc-controller-manager

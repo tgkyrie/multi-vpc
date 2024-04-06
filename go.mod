@@ -1,4 +1,4 @@
-module VpcConnection
+module multi-vpc
 
 go 1.21
 

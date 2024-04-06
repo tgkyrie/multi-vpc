@@ -5,8 +5,8 @@ metadata:
     app.kubernetes.io/name: clusterrole
     app.kubernetes.io/instance: proxy-role
     app.kubernetes.io/component: kube-rbac-proxy
-    app.kubernetes.io/created-by: vpcconnection
-    app.kubernetes.io/part-of: vpcconnection
+    app.kubernetes.io/created-by: multi-vpc
+    app.kubernetes.io/part-of: multi-vpc
     app.kubernetes.io/managed-by: kustomize
   name: proxy-role
 rules:

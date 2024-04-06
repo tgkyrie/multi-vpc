@@ -1,0 +1,27 @@
+# permissions for end users to view vpcdns.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: clusterrole
+    app.kubernetes.io/instance: vpcdns-viewer-role
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: multi-vpc
+    app.kubernetes.io/part-of: multi-vpc
+    app.kubernetes.io/managed-by: kustomize
+  name: vpcdns-viewer-role
+rules:
+- apiGroups:
+  - kubeovn.ustc.io.my.domain
+  resources:
+  - vpcdns
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - kubeovn.ustc.io.my.domain
+  resources:
+  - vpcdns/status
+  verbs:
+  - get

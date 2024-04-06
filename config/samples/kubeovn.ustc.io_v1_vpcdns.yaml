@@ -1,0 +1,12 @@
+apiVersion: kubeovn.ustc.io.my.domain/v1
+kind: VpcDns
+metadata:
+  labels:
+    app.kubernetes.io/name: vpcdns
+    app.kubernetes.io/instance: vpcdns-sample
+    app.kubernetes.io/part-of: multi-vpc
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: multi-vpc
+  name: vpcdns-sample
+spec:
+  # TODO(user): Add fields here

@@ -1,4 +1,4 @@
 ## Append samples of your project ##
 resources:
-- test_v1_vpcconnection.yaml
+- kubeovn.ustc.io_v1_vpcdns.yaml
 #+kubebuilder:scaffold:manifestskustomizesamples
