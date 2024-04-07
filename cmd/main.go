@@ -28,7 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
-	kubeovnustciov1 "multi-vpc/api/v1"
+	kubeovnv1 "multi-vpc/api/v1"
 	"multi-vpc/internal/controller"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
@@ -44,7 +44,7 @@ var (
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
-	utilruntime.Must(kubeovnustciov1.AddToScheme(scheme))
+	utilruntime.Must(kubeovnv1.AddToScheme(scheme))
 
 	utilruntime.Must(ovn.AddToScheme(scheme))
 }

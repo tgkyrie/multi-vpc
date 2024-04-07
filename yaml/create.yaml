@@ -1,0 +1,6 @@
+apiVersion: "kubeovn.ustc.io/v1"
+kind: VpcDns
+metadata:
+  name: dns-1
+spec:
+  vpc: test-vpc-1

@@ -4,13 +4,13 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.14.0
-  name: vpcdnsdnses.kubeovn.ustc.io
+  name: vpcdnses.kubeovn.ustc.io
 spec:
   group: kubeovn.ustc.io
   names:
     kind: VpcDns
     listKind: VpcDnsList
-    plural: vpcdnsdnses
+    plural: vpcdnses
     singular: vpcdns
   scope: Cluster
   versions:
