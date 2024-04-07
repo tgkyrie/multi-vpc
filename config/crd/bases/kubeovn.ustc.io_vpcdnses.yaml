@@ -12,7 +12,7 @@ spec:
     listKind: VpcDnsList
     plural: vpcdnses
     singular: vpcdns
-  scope: Cluster
+  scope: Namespaced
   versions:
   - name: v1
     schema:

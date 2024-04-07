@@ -14,9 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package v1 contains API Schema definitions for the kubeovn.ustc.io v1 API group
+// Package v1 contains API Schema definitions for the kubeovn v1 API group
 // +kubebuilder:object:generate=true
-// +groupName=kubeovn.ustc.io.my.domain
+// +groupName=kubeovn.ustc.io
 package v1
 
 import (

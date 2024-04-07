@@ -12,7 +12,7 @@ metadata:
   name: vpcdns-editor-role
 rules:
 - apiGroups:
-  - kubeovn.ustc.io.my.domain
+  - kubeovn.ustc.io
   resources:
   - vpcdns
   verbs:
@@ -24,7 +24,7 @@ rules:
   - update
   - watch
 - apiGroups:
-  - kubeovn.ustc.io.my.domain
+  - kubeovn.ustc.io
   resources:
   - vpcdns/status
   verbs:

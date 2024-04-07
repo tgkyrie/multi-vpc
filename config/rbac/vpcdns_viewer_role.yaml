@@ -12,7 +12,7 @@ metadata:
   name: vpcdns-viewer-role
 rules:
 - apiGroups:
-  - kubeovn.ustc.io.my.domain
+  - kubeovn.ustc.io
   resources:
   - vpcdns
   verbs:
@@ -20,7 +20,7 @@ rules:
   - list
   - watch
 - apiGroups:
-  - kubeovn.ustc.io.my.domain
+  - kubeovn.ustc.io
   resources:
   - vpcdns/status
   verbs:

@@ -5,7 +5,7 @@ metadata:
   name: manager-role
 rules:
 - apiGroups:
-  - kubeovn.ustc.io.my.domain
+  - kubeovn.ustc.io
   resources:
   - vpcdns
   verbs:
@@ -17,13 +17,13 @@ rules:
   - update
   - watch
 - apiGroups:
-  - kubeovn.ustc.io.my.domain
+  - kubeovn.ustc.io
   resources:
   - vpcdns/finalizers
   verbs:
   - update
 - apiGroups:
-  - kubeovn.ustc.io.my.domain
+  - kubeovn.ustc.io
   resources:
   - vpcdns/status
   verbs:

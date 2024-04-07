@@ -27,7 +27,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	kubeovnustciov1 "multi-vpc/api/v1"
+	kubeovnv1 "multi-vpc/api/v1"
 )
 
 var _ = Describe("VpcDns Controller", func() {
@@ -40,13 +40,13 @@ var _ = Describe("VpcDns Controller", func() {
 			Name:      resourceName,
 			Namespace: "default", // TODO(user):Modify as needed
 		}
-		vpcdns := &kubeovnustciov1.VpcDns{}
+		vpcdns := &kubeovnv1.VpcDns{}
 
 		BeforeEach(func() {
 			By("creating the custom resource for the Kind VpcDns")
 			err := k8sClient.Get(ctx, typeNamespacedName, vpcdns)
 			if err != nil && errors.IsNotFound(err) {
-				resource := &kubeovnustciov1.VpcDns{
+				resource := &kubeovnv1.VpcDns{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      resourceName,
 						Namespace: "default",
@@ -59,7 +59,7 @@ var _ = Describe("VpcDns Controller", func() {
 
 		AfterEach(func() {
 			// TODO(user): Cleanup logic after each test, like removing the resource instance.
-			resource := &kubeovnustciov1.VpcDns{}
+			resource := &kubeovnv1.VpcDns{}
 			err := k8sClient.Get(ctx, typeNamespacedName, resource)
 			Expect(err).NotTo(HaveOccurred())
 
