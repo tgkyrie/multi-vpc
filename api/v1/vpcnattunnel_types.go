@@ -33,6 +33,9 @@ type VpcNatTunnelSpec struct {
 	RemoteIP      string `json:"remoteIp"`
 	InterfaceAddr string `json:"interfaceAddr"`
 	NatGwDp       string `json:"natGwDp"`
+
+	GlobalnetCIDR       string `json:"GlobalnetCIDR"`
+	RemoteGlobalnetCIDR string `json:"remoteGlobalnetCIDR"`
 }
 
 // VpcNatTunnelStatus defines the observed state of VpcNatTunnel
@@ -44,6 +47,9 @@ type VpcNatTunnelStatus struct {
 	RemoteIP      string `json:"remoteIp"`
 	InterfaceAddr string `json:"interfaceAddr"`
 	NatGwDp       string `json:"natGwDp"`
+
+	GlobalnetCIDR       string `json:"GlobalnetCIDR"`
+	RemoteGlobalnetCIDR string `json:"remoteGlobalnetCIDR"`
 }
 
 //+kubebuilder:object:root=true

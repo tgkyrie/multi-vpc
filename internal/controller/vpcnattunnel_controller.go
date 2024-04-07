@@ -25,7 +25,6 @@ import (
 
 	// appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
@@ -96,7 +95,7 @@ func (r *VpcNatTunnelReconciler) execCommandInPod(podName, namespace, containerN
 		Name(podName).
 		Namespace(namespace).SubResource("exec").Param("container", containerName)
 	req.VersionedParams(
-		&v1.PodExecOptions{
+		&corev1.PodExecOptions{
 			Command: cmd,
 			Stdin:   false,
 			Stdout:  true,
@@ -222,7 +221,8 @@ func (r *VpcNatTunnelReconciler) handleCreateOrUpdate(ctx context.Context, vpcTu
 		r.Status().Update(ctx, vpcTunnel)
 
 	} else if vpcTunnel.Status.Initialized && (vpcTunnel.Status.InternalIP != vpcTunnel.Spec.InternalIP || vpcTunnel.Status.RemoteIP != vpcTunnel.Spec.RemoteIP ||
-		vpcTunnel.Status.InterfaceAddr != vpcTunnel.Spec.InterfaceAddr || vpcTunnel.Status.NatGwDp != vpcTunnel.Spec.NatGwDp) {
+		vpcTunnel.Status.InterfaceAddr != vpcTunnel.Spec.InterfaceAddr || vpcTunnel.Status.NatGwDp != vpcTunnel.Spec.NatGwDp ||
+		vpcTunnel.Status.GlobalnetCIDR != vpcTunnel.Spec.GlobalnetCIDR || vpcTunnel.Status.RemoteGlobalnetCIDR != vpcTunnel.Spec.RemoteGlobalnetCIDR) {
 		if vpcTunnel.Status.NatGwDp == vpcTunnel.Spec.NatGwDp {
 			podnext, err := r.getNatGwPod(vpcTunnel.Spec.NatGwDp) // find pod named Spec.NatGwDp
 			if err != nil {
