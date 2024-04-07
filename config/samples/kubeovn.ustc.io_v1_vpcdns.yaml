@@ -1,4 +1,4 @@
-apiVersion: kubeovn.ustc.io.my.domain/v1
+apiVersion: kubeovn.ustc.io/v1
 kind: VpcDns
 metadata:
   labels:

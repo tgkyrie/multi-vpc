@@ -23,13 +23,6 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
-type VpcDnsState string
-
-const (
-	DnsRunning VpcDnsState = "DnsRunning"
-	DnsStopped VpcDnsState = "DnsStopped"
-)
-
 // VpcDnsSpec defines the desired state of VpcDns
 type VpcDnsSpec struct {
 	Vpc string `json:"vpc,omitempty"`
@@ -37,7 +30,7 @@ type VpcDnsSpec struct {
 
 // VpcDnsStatus defines the observed state of VpcDns
 type VpcDnsStatus struct {
-	State VpcDnsState `json:"state,omitempty"`
+	Initialized bool `json:"initialized,omitempty"`
 }
 
 //+kubebuilder:object:root=true

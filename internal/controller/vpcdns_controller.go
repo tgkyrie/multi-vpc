@@ -23,7 +23,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
-	"k8s.io/klog/v2"
 	kubeovnv1 "multi-vpc/api/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -43,7 +42,6 @@ func (r *VpcDnsReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	vpcDns := &kubeovnv1.VpcDns{}
 	err := r.Get(ctx, req.NamespacedName, vpcDns)
 	if err != nil {
-		log.Log.Error(err, "unable to fetch vpcDns")
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 	if !vpcDns.ObjectMeta.DeletionTimestamp.IsZero() {
@@ -259,13 +257,13 @@ func (r *VpcDnsReconciler) deleteDnsConnection(ctx context.Context, vpcDns *kube
 	// 获取对应的 subnet
 	var subnet ovn.Subnet
 	err = r.Client.Get(ctx, client.ObjectKey{
-		Name: ovnDns.Spec.Subnet,
+		Name: "ovn-default",
 	}, &subnet)
 	if err != nil {
 		return err
 	}
 	// 在 Vpc-Dns 的 Deployment 中 删除到 CoreDNS 的路由
-	route := " ip -4 route add " + coreDnsSvc.Spec.ClusterIP + " via " + subnet.Spec.Gateway + " dev net1;"
+	route := `ip -4 route add ` + coreDnsSvc.Spec.ClusterIP + ` via ` + subnet.Spec.Gateway + ` dev net1;`
 	initContainers := ovnDnsDeployment.Spec.Template.Spec.InitContainers
 	for i := 0; i < len(initContainers); i++ {
 		for j := 0; j < len(initContainers[i].Command); j++ {
@@ -276,104 +274,13 @@ func (r *VpcDnsReconciler) deleteDnsConnection(ctx context.Context, vpcDns *kube
 	}
 	// 更新 Deployment
 	err = r.Client.Update(ctx, &ovnDnsDeployment)
-	r.updateStatus(ctx, vpcDns, kubeovnv1.DnsRunning)
+	// 更新状态
+	vpcDns.Status.Initialized = true
+	err = r.Update(ctx, vpcDns)
 	if err != nil {
 		return err
 	}
 	return nil
-}
-
-//// 检查跨集群 Dns 功能
-//func (r *VpcDnsReconciler) checkDnsConnection(ctx context.Context, vd *kubeovnv1.VpcDns) (bool, error) {
-//	var vpcDnsList ovn.VpcDnsList
-//	var vpcDns ovn.VpcDns
-//	var subnet ovn.Subnet
-//	err := r.Client.List(ctx, &vpcDnsList, &client.ListOptions{})
-//	if err != nil {
-//		return false, err
-//	}
-//	// 寻找资源状态为 true 的 Vpc-Dns
-//	for _, it := range vpcDnsList.Items {
-//		if it.Spec.Vpc == vd.Spec.Vpc && it.Status.Active == true {
-//			vpcDns = it
-//			break
-//		}
-//	}
-//	// 获取对应的 subnet
-//	err = r.Client.Get(ctx, client.ObjectKey{
-//		Name: vpcDns.Spec.Subnet,
-//	}, &subnet)
-//	if err != nil {
-//		return false, err
-//	}
-//	if len(subnet.Spec.Namespaces) == 0 {
-//		return false, err
-//	}
-//	// 获取 CoreDNS 的 svc
-//	var coreDnsSvc corev1.Service
-//	err = r.Client.Get(ctx, client.ObjectKey{
-//		Name:      "kube-dns",
-//		Namespace: "kube-system",
-//	}, &coreDnsSvc)
-//	if err != nil {
-//		return false, err
-//	}
-//	// 构建临时 pod 和命令
-//	command := "dig no.no.svc.clusterset.local"
-//	nameSpace := subnet.Spec.Namespaces[0]
-//	pod := &corev1.Pod{
-//		ObjectMeta: metav1.ObjectMeta{
-//			Name:      "dig-test",
-//			Namespace: nameSpace,
-//		},
-//		Spec: corev1.PodSpec{
-//			Containers: []corev1.Container{
-//				{
-//					Name:    "test",
-//					Image:   "nicolaka/netshoot",
-//					Command: []string{"/bin/bash", "-c", command},
-//				},
-//			},
-//			RestartPolicy: corev1.RestartPolicyNever,
-//		},
-//	}
-//	clientSet, err := kubernetes.NewForConfig(r.Config)
-//	if err != nil {
-//		return false, err
-//	}
-//	resultPod, err := clientSet.CoreV1().Pods(nameSpace).Create(context.TODO(), pod, metav1.CreateOptions{})
-//	if err != nil {
-//		panic(err.Error())
-//	}
-//
-//	podLog, err := clientSet.CoreV1().Pods(nameSpace).GetLogs(resultPod.Name, &corev1.PodLogOptions{}).Stream(context.TODO())
-//	if err != nil {
-//		return false, err
-//	}
-//	defer podLog.Close()
-//	err = clientSet.CoreV1().Pods(nameSpace).Delete(ctx, resultPod.Name, metav1.DeleteOptions{})
-//	if err != nil {
-//		return false, err
-//	}
-//	buf := new(bytes.Buffer)
-//	buf.ReadFrom(podLog)
-//	res := buf.String()
-//	if !strings.Contains(res, "time out") || strings.Contains(res, coreDnsSvc.Spec.ClusterIP) {
-//		r.updateStatus(ctx, vd, kubeovnv1.DnsRunning)
-//		return true, nil
-//	} else {
-//		r.updateStatus(ctx, vd, kubeovnv1.DnsStopped)
-//		return false, nil
-//	}
-//}
-
-// 更新 CR 的状态
-func (r *VpcDnsReconciler) updateStatus(ctx context.Context, vd *kubeovnv1.VpcDns, state kubeovnv1.VpcDnsState) {
-	vd.Status.State = state
-	err := r.Client.Update(ctx, vd)
-	if err != nil {
-		klog.Errorf("update status error:%v", err)
-	}
 }
 
 func containsString(slice []string, s string) bool {
