@@ -21,7 +21,6 @@ make docker-build docker-push
 
 ```sh
 make deploy
-注：由于构建好deploy.yaml后需要加上一些ClusterRole，因此建议直接使用工程目录下的deploy.yaml
 ```
 
 ### 本地保存镜像文件，远程集群导入镜像文件
