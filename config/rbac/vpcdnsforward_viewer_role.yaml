@@ -1,31 +1,27 @@
-# permissions for end users to edit vpcdns.
+# permissions for end users to view vpcdnsforwards.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   labels:
     app.kubernetes.io/name: clusterrole
-    app.kubernetes.io/instance: vpcdns-editor-role
+    app.kubernetes.io/instance: vpcdnsforward-viewer-role
     app.kubernetes.io/component: rbac
     app.kubernetes.io/created-by: multi-vpc
     app.kubernetes.io/part-of: multi-vpc
     app.kubernetes.io/managed-by: kustomize
-  name: vpcdns-editor-role
+  name: vpcdnsforward-viewer-role
 rules:
 - apiGroups:
   - kubeovn.ustc.io
   resources:
-  - vpcdns
+  - vpcdnsforwards
   verbs:
-  - create
-  - delete
   - get
   - list
-  - patch
-  - update
   - watch
 - apiGroups:
   - kubeovn.ustc.io
   resources:
-  - vpcdns/status
+  - vpcdnsforwards/status
   verbs:
   - get

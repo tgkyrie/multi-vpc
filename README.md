@@ -48,7 +48,7 @@ kubectl apply -f deploy.yaml
 新建 dns.yaml
 ```yaml
 apiVersion: "kubeovn.ustc.io/v1"
-kind: VpcDns
+kind: VpcDnsForward
 metadata:
   name: dns-1
   namespace: ns1

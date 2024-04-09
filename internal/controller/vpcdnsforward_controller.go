@@ -18,28 +18,48 @@ package controller
 
 import (
 	"context"
+	"k8s.io/client-go/rest"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"strings"
+
 	ovn "github.com/kubeovn/kube-ovn/pkg/apis/kubeovn/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/rest"
 	kubeovnv1 "multi-vpc/api/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-	"strings"
 )
 
-type VpcDnsReconciler struct {
+// VpcDnsForwardReconciler reconciles a VpcDnsForward object
+type VpcDnsForwardReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
 	Config *rest.Config
 }
 
-func (r *VpcDnsReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+//+kubebuilder:rbac:groups=kubeovn.ustc.io,resources=vpcdnsforwards,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=kubeovn.ustc.io,resources=vpcdnsforwards/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=kubeovn.ustc.io,resources=vpcdnsforwards/finalizers,verbs=update
+//+kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups="",resources=services,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=kubeovn.io,resources=subnets,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=kubeovn.io,resources=vpc-dnses,verbs=get;list;watch;create;update;patch;delete
+
+// Reconcile is part of the main kubernetes reconciliation loop which aims to
+// move the current state of the cluster closer to the desired state.
+// TODO(user): Modify the Reconcile function to compare the state specified by
+// the VpcDnsForward object against the actual cluster state, and then
+// perform operations to make the cluster state reflect the state specified by
+// the user.
+//
+// For more details, check Reconcile and its Result here:
+// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.17.0/pkg/reconcile
+func (r *VpcDnsForwardReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	_ = log.FromContext(ctx)
-	vpcDns := &kubeovnv1.VpcDns{}
+	vpcDns := &kubeovnv1.VpcDnsForward{}
 	err := r.Get(ctx, req.NamespacedName, vpcDns)
 	if err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
@@ -50,7 +70,7 @@ func (r *VpcDnsReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	return r.handleCreateOrUpdate(ctx, vpcDns)
 }
 
-func (r *VpcDnsReconciler) handleCreateOrUpdate(ctx context.Context, vpcDns *kubeovnv1.VpcDns) (ctrl.Result, error) {
+func (r *VpcDnsForwardReconciler) handleCreateOrUpdate(ctx context.Context, vpcDns *kubeovnv1.VpcDnsForward) (ctrl.Result, error) {
 	if !containsString(vpcDns.ObjectMeta.Finalizers, "dns.finalizer.ustc.io") {
 		controllerutil.AddFinalizer(vpcDns, "dns.finalizer.ustc.io")
 		err := r.Update(ctx, vpcDns)
@@ -65,7 +85,7 @@ func (r *VpcDnsReconciler) handleCreateOrUpdate(ctx context.Context, vpcDns *kub
 	return ctrl.Result{}, nil
 }
 
-func (r *VpcDnsReconciler) handleDelete(ctx context.Context, vpcDns *kubeovnv1.VpcDns) (ctrl.Result, error) {
+func (r *VpcDnsForwardReconciler) handleDelete(ctx context.Context, vpcDns *kubeovnv1.VpcDnsForward) (ctrl.Result, error) {
 	if containsString(vpcDns.ObjectMeta.Finalizers, "dns.finalizer.ustc.io") {
 		err := r.deleteDnsConnection(ctx, vpcDns)
 		if err != nil {
@@ -81,7 +101,7 @@ func (r *VpcDnsReconciler) handleDelete(ctx context.Context, vpcDns *kubeovnv1.V
 }
 
 // 检查 Vpc-Dns 的 Corefile
-func (r *VpcDnsReconciler) checkDnsCorefile(ctx context.Context) (bool, error) {
+func (r *VpcDnsForwardReconciler) checkDnsCorefile(ctx context.Context) (bool, error) {
 	cm := corev1.ConfigMap{}
 	err := r.Get(ctx, client.ObjectKey{
 		Name:      "vpc-dns-corefile",
@@ -98,7 +118,7 @@ func (r *VpcDnsReconciler) checkDnsCorefile(ctx context.Context) (bool, error) {
 }
 
 // 更新 Vpc-Dns 的 Corefile
-func (r *VpcDnsReconciler) updateDnsCorefile(ctx context.Context) error {
+func (r *VpcDnsForwardReconciler) updateDnsCorefile(ctx context.Context) error {
 	cm := corev1.ConfigMap{}
 	err := r.Get(ctx, client.ObjectKey{
 		Name:      "vpc-dns-corefile",
@@ -150,7 +170,7 @@ func (r *VpcDnsReconciler) updateDnsCorefile(ctx context.Context) error {
 }
 
 // 建立 DNS 路由转发
-func (r *VpcDnsReconciler) createDnsConnection(ctx context.Context, vpcDns *kubeovnv1.VpcDns) error {
+func (r *VpcDnsForwardReconciler) createDnsConnection(ctx context.Context, vpcDns *kubeovnv1.VpcDnsForward) error {
 	state, err := r.checkDnsCorefile(ctx)
 	if err != nil {
 		return err
@@ -222,7 +242,7 @@ func (r *VpcDnsReconciler) createDnsConnection(ctx context.Context, vpcDns *kube
 }
 
 // 删除 DNS 路由转发
-func (r *VpcDnsReconciler) deleteDnsConnection(ctx context.Context, vpcDns *kubeovnv1.VpcDns) error {
+func (r *VpcDnsForwardReconciler) deleteDnsConnection(ctx context.Context, vpcDns *kubeovnv1.VpcDnsForward) error {
 	// 获取 CoreDNS 的 svc
 	var coreDnsSvc corev1.Service
 	err := r.Client.Get(ctx, client.ObjectKey{
@@ -283,18 +303,9 @@ func (r *VpcDnsReconciler) deleteDnsConnection(ctx context.Context, vpcDns *kube
 	return nil
 }
 
-func containsString(slice []string, s string) bool {
-	for _, item := range slice {
-		if item == s {
-			return true
-		}
-	}
-	return false
-}
-
 // SetupWithManager sets up the controller with the Manager.
-func (r *VpcDnsReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *VpcDnsForwardReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&kubeovnv1.VpcDns{}).
+		For(&kubeovnv1.VpcDnsForward{}).
 		Complete(r)
 }

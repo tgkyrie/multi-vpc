@@ -23,37 +23,43 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
-// VpcDnsSpec defines the desired state of VpcDns
-type VpcDnsSpec struct {
+// VpcDnsForwardSpec defines the desired state of VpcDnsForward
+type VpcDnsForwardSpec struct {
+	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
+	// Important: Run "make" to regenerate code after modifying this file
+
+	// Foo is an example field of VpcDnsForward. Edit vpcdnsforward_types.go to remove/update
 	Vpc string `json:"vpc,omitempty"`
 }
 
-// VpcDnsStatus defines the observed state of VpcDns
-type VpcDnsStatus struct {
+// VpcDnsForwardStatus defines the observed state of VpcDnsForward
+type VpcDnsForwardStatus struct {
+	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
+	// Important: Run "make" to regenerate code after modifying this file
 	Initialized bool `json:"initialized,omitempty"`
 }
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 
-// VpcDns is the Schema for the vpcdns API
-type VpcDns struct {
+// VpcDnsForward is the Schema for the vpcdnsforwards API
+type VpcDnsForward struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   VpcDnsSpec   `json:"spec,omitempty"`
-	Status VpcDnsStatus `json:"status,omitempty"`
+	Spec   VpcDnsForwardSpec   `json:"spec,omitempty"`
+	Status VpcDnsForwardStatus `json:"status,omitempty"`
 }
 
 //+kubebuilder:object:root=true
 
-// VpcDnsList contains a list of VpcDns
-type VpcDnsList struct {
+// VpcDnsForwardList contains a list of VpcDnsForward
+type VpcDnsForwardList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []VpcDns `json:"items"`
+	Items           []VpcDnsForward `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&VpcDns{}, &VpcDnsList{})
+	SchemeBuilder.Register(&VpcDnsForward{}, &VpcDnsForwardList{})
 }

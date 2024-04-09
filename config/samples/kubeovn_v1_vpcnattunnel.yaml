@@ -1,12 +1,12 @@
 apiVersion: kubeovn.ustc.io/v1
-kind: VpcDns
+kind: VpcNatTunnel
 metadata:
   labels:
-    app.kubernetes.io/name: vpcdns
-    app.kubernetes.io/instance: vpcdns-sample
+    app.kubernetes.io/name: vpcnattunnel
+    app.kubernetes.io/instance: vpcnattunnel-sample
     app.kubernetes.io/part-of: multi-vpc
     app.kubernetes.io/managed-by: kustomize
     app.kubernetes.io/created-by: multi-vpc
-  name: vpcdns-sample
+  name: vpcnattunnel-sample
 spec:
   # TODO(user): Add fields here

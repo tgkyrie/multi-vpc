@@ -30,7 +30,7 @@ import (
 	kubeovnv1 "multi-vpc/api/v1"
 )
 
-var _ = Describe("VpcDns Controller", func() {
+var _ = Describe("VpcDnsForward Controller", func() {
 	Context("When reconciling a resource", func() {
 		const resourceName = "test-resource"
 
@@ -40,13 +40,13 @@ var _ = Describe("VpcDns Controller", func() {
 			Name:      resourceName,
 			Namespace: "default", // TODO(user):Modify as needed
 		}
-		vpcdns := &kubeovnv1.VpcDns{}
+		vpcdnsforward := &kubeovnv1.VpcDnsForward{}
 
 		BeforeEach(func() {
-			By("creating the custom resource for the Kind VpcDns")
-			err := k8sClient.Get(ctx, typeNamespacedName, vpcdns)
+			By("creating the custom resource for the Kind VpcDnsForward")
+			err := k8sClient.Get(ctx, typeNamespacedName, vpcdnsforward)
 			if err != nil && errors.IsNotFound(err) {
-				resource := &kubeovnv1.VpcDns{
+				resource := &kubeovnv1.VpcDnsForward{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      resourceName,
 						Namespace: "default",
@@ -59,16 +59,16 @@ var _ = Describe("VpcDns Controller", func() {
 
 		AfterEach(func() {
 			// TODO(user): Cleanup logic after each test, like removing the resource instance.
-			resource := &kubeovnv1.VpcDns{}
+			resource := &kubeovnv1.VpcDnsForward{}
 			err := k8sClient.Get(ctx, typeNamespacedName, resource)
 			Expect(err).NotTo(HaveOccurred())
 
-			By("Cleanup the specific resource instance VpcDns")
+			By("Cleanup the specific resource instance VpcDnsForward")
 			Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
 		})
 		It("should successfully reconcile the resource", func() {
 			By("Reconciling the created resource")
-			controllerReconciler := &VpcDnsReconciler{
+			controllerReconciler := &VpcDnsForwardReconciler{
 				Client: k8sClient,
 				Scheme: k8sClient.Scheme(),
 			}

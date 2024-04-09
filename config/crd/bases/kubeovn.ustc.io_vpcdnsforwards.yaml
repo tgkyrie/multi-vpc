@@ -4,20 +4,20 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.14.0
-  name: vpcdnses.kubeovn.ustc.io
+  name: vpcdnsforwards.kubeovn.ustc.io
 spec:
   group: kubeovn.ustc.io
   names:
-    kind: VpcDns
-    listKind: VpcDnsList
-    plural: vpcdnses
-    singular: vpcdns
+    kind: VpcDnsForward
+    listKind: VpcDnsForwardList
+    plural: vpcdnsforwards
+    singular: vpcdnsforward
   scope: Namespaced
   versions:
   - name: v1
     schema:
       openAPIV3Schema:
-        description: VpcDns is the Schema for the vpcdns API
+        description: VpcDnsForward is the Schema for the vpcdnsforwards API
         properties:
           apiVersion:
             description: |-
@@ -37,15 +37,20 @@ spec:
           metadata:
             type: object
           spec:
-            description: VpcDnsSpec defines the desired state of VpcDns
+            description: VpcDnsForwardSpec defines the desired state of VpcDnsForward
             properties:
               vpc:
+                description: Foo is an example field of VpcDnsForward. Edit vpcdnsforward_types.go
+                  to remove/update
                 type: string
             type: object
           status:
-            description: VpcDnsStatus defines the observed state of VpcDns
+            description: VpcDnsForwardStatus defines the observed state of VpcDnsForward
             properties:
               initialized:
+                description: |-
+                  INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
+                  Important: Run "make" to regenerate code after modifying this file
                 type: boolean
             type: object
         type: object

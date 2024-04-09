@@ -5,9 +5,76 @@ metadata:
   name: manager-role
 rules:
 - apiGroups:
-  - kubeovn.ustc.io
+  - ""
   resources:
-  - vpcdns
+  - configmaps
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - services
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apps
+  resources:
+  - deployments
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - pods/exec
+  verbs:
+  - create
+  - get
+- apiGroups:
+  - kubeovn.io
+  resources:
+  - subnets
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - kubeovn.io
+  resources:
+  - vpc-dnses
   verbs:
   - create
   - delete
@@ -19,14 +86,66 @@ rules:
 - apiGroups:
   - kubeovn.ustc.io
   resources:
-  - vpcdns/finalizers
+  - vpcdnsforwards
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - kubeovn.ustc.io
+  resources:
+  - vpcdnsforwards/finalizers
   verbs:
   - update
 - apiGroups:
   - kubeovn.ustc.io
   resources:
-  - vpcdns/status
+  - vpcdnsforwards/status
   verbs:
   - get
   - patch
   - update
+- apiGroups:
+  - kubeovn.ustc.io
+  resources:
+  - vpcnattunnels
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - kubeovn.ustc.io
+  resources:
+  - vpcnattunnels/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - kubeovn.ustc.io
+  resources:
+  - vpcnattunnels/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - submariner.io
+  resources:
+  - clusterglobalegressips
+  verbs:
+  - get
+  - list
+- apiGroups:
+  - submariner.io
+  resources:
+  - gateways
+  verbs:
+  - get
+  - list
