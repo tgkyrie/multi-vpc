@@ -49,3 +49,17 @@ rules:
   - get
   - patch
   - update
+- apiGroups:
+  - submariner.io
+  resources:
+  - clusterglobalegressips
+  verbs:
+  - get
+  - list
+- apiGroups:
+  - submariner.io
+  resources:
+  - gateways
+  verbs:
+  - get
+  - list

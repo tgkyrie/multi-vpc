@@ -64,7 +64,6 @@ spec:
   interfaceAddr: "10.0.0.1/24" #隧道地址
   natGwDp: "vpc2-net1-gateway" #vpc网关名字
 
-  GlobalnetCIDR: "242.1.0.0/16"
   remoteGlobalnetCIDR: "242.0.0.0/16"
 
 ```

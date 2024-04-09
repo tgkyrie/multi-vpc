@@ -39,8 +39,6 @@ spec:
           spec:
             description: VpcNatTunnelSpec defines the desired state of VpcNatTunnel
             properties:
-              GlobalnetCIDR:
-                type: string
               interfaceAddr:
                 type: string
               internalIp:
@@ -54,7 +52,6 @@ spec:
               remoteIp:
                 type: string
             required:
-            - GlobalnetCIDR
             - interfaceAddr
             - internalIp
             - natGwDp
@@ -64,6 +61,10 @@ spec:
           status:
             description: VpcNatTunnelStatus defines the observed state of VpcNatTunnel
             properties:
+              GlobalEgressIP:
+                items:
+                  type: string
+                type: array
               GlobalnetCIDR:
                 type: string
               initialized:
@@ -77,16 +78,20 @@ spec:
                 type: string
               natGwDp:
                 type: string
+              ovnGwIP:
+                type: string
               remoteGlobalnetCIDR:
                 type: string
               remoteIp:
                 type: string
             required:
+            - GlobalEgressIP
             - GlobalnetCIDR
             - initialized
             - interfaceAddr
             - internalIp
             - natGwDp
+            - ovnGwIP
             - remoteGlobalnetCIDR
             - remoteIp
             type: object
