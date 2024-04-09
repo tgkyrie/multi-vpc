@@ -29,7 +29,7 @@ type VpcNatTunnelSpec struct {
 	// Important: Run "make" to regenerate code after modifying this file
 
 	// Foo is an example field of VpcNatTunnel. Edit vpcnattunnel_types.go to remove/update
-	InternalIP    string `json:"internalIp"`
+	// InternalIP    string `json:"internalIp"`
 	RemoteIP      string `json:"remoteIp"`
 	InterfaceAddr string `json:"interfaceAddr"`
 	NatGwDp       string `json:"natGwDp"`

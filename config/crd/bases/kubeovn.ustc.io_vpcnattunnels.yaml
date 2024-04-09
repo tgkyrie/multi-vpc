@@ -41,19 +41,17 @@ spec:
             properties:
               interfaceAddr:
                 type: string
-              internalIp:
-                description: Foo is an example field of VpcNatTunnel. Edit vpcnattunnel_types.go
-                  to remove/update
-                type: string
               natGwDp:
                 type: string
               remoteGlobalnetCIDR:
                 type: string
               remoteIp:
+                description: |-
+                  Foo is an example field of VpcNatTunnel. Edit vpcnattunnel_types.go to remove/update
+                  InternalIP    string `json:"internalIp"`
                 type: string
             required:
             - interfaceAddr
-            - internalIp
             - natGwDp
             - remoteGlobalnetCIDR
             - remoteIp

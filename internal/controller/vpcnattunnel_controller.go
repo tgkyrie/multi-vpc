@@ -189,8 +189,15 @@ func (r *VpcNatTunnelReconciler) getGlobalEgressIP() ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	return submGlobalEgressIP.Status.AllocatedIPs, nil
+}
+
+func (r *VpcNatTunnelReconciler) getGwExternIP(pod *corev1.Pod) (string, error) {
+	if ExternIP, ok := pod.Annotations["ovn-vpc-external-network.kube-system.kubernetes.io/ip_address"]; ok {
+		return ExternIP, nil
+	} else {
+		return "", fmt.Errorf("no ovn-vpc-external-network ip")
+	}
 }
 
 func (r *VpcNatTunnelReconciler) getPodGwIP(pod *corev1.Pod) (string, error) {
@@ -202,7 +209,7 @@ func (r *VpcNatTunnelReconciler) getPodGwIP(pod *corev1.Pod) (string, error) {
 }
 
 func genCreateTunnelCmd(tunnel *kubeovnv1.VpcNatTunnel) string {
-	createCmd := fmt.Sprintf("ip tunnel add %s mode gre remote %s local %s ttl 255", tunnel.Name, tunnel.Spec.RemoteIP, tunnel.Spec.InternalIP)
+	createCmd := fmt.Sprintf("ip tunnel add %s mode gre remote %s local %s ttl 255", tunnel.Name, tunnel.Spec.RemoteIP, tunnel.Status.InternalIP)
 	setUpCmd := fmt.Sprintf("ip link set %s up", tunnel.Name)
 	addrCmd := fmt.Sprintf("ip addr add %s dev %s", tunnel.Spec.InterfaceAddr, tunnel.Name)
 	return createCmd + ";" + setUpCmd + ";" + addrCmd
@@ -220,12 +227,9 @@ func genGlobalnetRoute(GlobalnetCIDR string, ovnGwIP string, RemoteGlobalnetCIDR
 }
 
 func delGlobalnetRoute(GlobalnetCIDR string, ovnGwIP string, RemoteGlobalnetCIDR string, tunnelName string, GlobalEgressIP []string) string {
-	// 入流量转发给ovn网关(逻辑交换机)
 	InFlowRoute := fmt.Sprintf("ip route del %s via %s dev eth0", GlobalnetCIDR, ovnGwIP)
-	// 跨集群流量路由至隧道
 	OutFlowRoute := fmt.Sprintf("ip route del %s dev %s", RemoteGlobalnetCIDR, tunnelName)
 
-	// 创建snat，将跨集群流量数据包源地址修改为ClusterGlobalEgressIP(globalnet cidr前8个)
 	SNAT := fmt.Sprintf("iptables -t nat -D POSTROUTING -d %s -j SNAT --to-source %s-%s", RemoteGlobalnetCIDR, GlobalEgressIP[0], GlobalEgressIP[len(GlobalEgressIP)-1])
 	return InFlowRoute + ";" + OutFlowRoute + ";" + SNAT
 }
@@ -257,10 +261,6 @@ func (r *VpcNatTunnelReconciler) handleCreateOrUpdate(ctx context.Context, vpcTu
 		if err != nil {
 			return ctrl.Result{}, err
 		}
-		err = r.execCommandInPod(podnext.Name, podnext.Namespace, "vpc-nat-gw", genCreateTunnelCmd(vpcTunnel))
-		if err != nil {
-			return ctrl.Result{}, err
-		}
 
 		// find local cluster GlobalnetCIDR
 		GlobalnetCIDR, err := r.getGlobalnetCIDR()
@@ -278,32 +278,29 @@ func (r *VpcNatTunnelReconciler) handleCreateOrUpdate(ctx context.Context, vpcTu
 			return ctrl.Result{}, err
 		}
 		vpcTunnel.Status.GlobalEgressIP = GlobalEgressIP
+		GwExternIP, err := r.getGwExternIP(podnext)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		vpcTunnel.Status.InternalIP = GwExternIP
+
+		err = r.execCommandInPod(podnext.Name, podnext.Namespace, "vpc-nat-gw", genCreateTunnelCmd(vpcTunnel))
+		if err != nil {
+			return ctrl.Result{}, err
+		}
 		err = r.execCommandInPod(podnext.Name, podnext.Namespace, "vpc-nat-gw", genGlobalnetRoute(GlobalnetCIDR, ovnGwIP, vpcTunnel.Name, vpcTunnel.Spec.RemoteGlobalnetCIDR, GlobalEgressIP))
 		if err != nil {
 			return ctrl.Result{}, err
 		}
 
-		// statefulSet := &appsv1.StatefulSet{}
-		// err = r.Get(ctx, types.NamespacedName{Name: "vpc-nat-gw-" + vpcTunnel.Spec.NatGwDp, Namespace: "kube-system"}, statefulSet) // get StatefulSet named Spec.NatGwDp
-		// if err != nil {
-		// 	return ctrl.Result{}, err
-		// }
-		// // get StatefulSet Containers command  at the begin is "while true; do sleep 10000; done"
-		// oldRestartCommand := statefulSet.Spec.Template.Spec.Containers[0].Args[1]
-		// // insert create tunnel command at head  in statefulSet Containers
-		// newRestartCommand := genCreateTunnelCmd(vpcTunnel) + oldRestartCommand
-		// statefulSet.Spec.Template.Spec.Containers[0].Args[1] = newRestartCommand
-
 		vpcTunnel.Status.Initialized = true
-		vpcTunnel.Status.InternalIP = vpcTunnel.Spec.InternalIP
 		vpcTunnel.Status.RemoteIP = vpcTunnel.Spec.RemoteIP
 		vpcTunnel.Status.InterfaceAddr = vpcTunnel.Spec.InterfaceAddr
 		vpcTunnel.Status.NatGwDp = vpcTunnel.Spec.NatGwDp
 		r.Status().Update(ctx, vpcTunnel)
 
-	} else if vpcTunnel.Status.Initialized && (vpcTunnel.Status.InternalIP != vpcTunnel.Spec.InternalIP || vpcTunnel.Status.RemoteIP != vpcTunnel.Spec.RemoteIP ||
-		vpcTunnel.Status.InterfaceAddr != vpcTunnel.Spec.InterfaceAddr || vpcTunnel.Status.NatGwDp != vpcTunnel.Spec.NatGwDp ||
-		vpcTunnel.Status.RemoteGlobalnetCIDR != vpcTunnel.Spec.RemoteGlobalnetCIDR) {
+	} else if vpcTunnel.Status.Initialized && (vpcTunnel.Status.RemoteIP != vpcTunnel.Spec.RemoteIP || vpcTunnel.Status.InterfaceAddr != vpcTunnel.Spec.InterfaceAddr ||
+		vpcTunnel.Status.NatGwDp != vpcTunnel.Spec.NatGwDp || vpcTunnel.Status.RemoteGlobalnetCIDR != vpcTunnel.Spec.RemoteGlobalnetCIDR) {
 		if vpcTunnel.Status.NatGwDp == vpcTunnel.Spec.NatGwDp { // NatGwDp not change
 			podnext, err := r.getNatGwPod(vpcTunnel.Spec.NatGwDp) // find pod named Spec.NatGwDp
 			if err != nil {
@@ -329,20 +326,6 @@ func (r *VpcNatTunnelReconciler) handleCreateOrUpdate(ctx context.Context, vpcTu
 				}
 			}
 
-			// statefulSet := &appsv1.StatefulSet{}
-			// err := r.Get(ctx, types.NamespacedName{Name: "vpc-nat-gw-" + vpcTunnel.Status.NatGwDp, Namespace: "kube-system"}, statefulSet) // get StatefulSet named Status.NatGwDp
-			// if err != nil {
-			// 	return ctrl.Result{}, err
-			// }
-			// // get StatefulSet Containers command  at the begin is "while true; do sleep 10000; done"
-			// oldRestartCommand := statefulSet.Spec.Template.Spec.Containers[0].Args[1]
-			// // delete create tunnel command  in statefulSet Containers
-			// comd := genLastCreateTunnelCmd(vpcTunnel)
-			// index := strings.Index(oldRestartCommand, comd)
-			// newRestartCommand := genCreateTunnelCmd(vpcTunnel) + oldRestartCommand[:index] + oldRestartCommand[index+len(comd):]
-			// statefulSet.Spec.Template.Spec.Containers[0].Args[1] = newRestartCommand
-
-			vpcTunnel.Status.InternalIP = vpcTunnel.Spec.InternalIP
 			vpcTunnel.Status.RemoteIP = vpcTunnel.Spec.RemoteIP
 			vpcTunnel.Status.InterfaceAddr = vpcTunnel.Spec.InterfaceAddr
 			vpcTunnel.Status.NatGwDp = vpcTunnel.Spec.NatGwDp
@@ -359,10 +342,6 @@ func (r *VpcNatTunnelReconciler) handleCreateOrUpdate(ctx context.Context, vpcTu
 				return ctrl.Result{}, err
 			}
 			podnext, err := r.getNatGwPod(vpcTunnel.Spec.NatGwDp) // find pod named Status.NatGwDp
-			if err != nil {
-				return ctrl.Result{}, err
-			}
-			err = r.execCommandInPod(podnext.Name, podnext.Namespace, "vpc-nat-gw", genCreateTunnelCmd(vpcTunnel))
 			if err != nil {
 				return ctrl.Result{}, err
 			}
@@ -383,35 +362,21 @@ func (r *VpcNatTunnelReconciler) handleCreateOrUpdate(ctx context.Context, vpcTu
 				return ctrl.Result{}, err
 			}
 			vpcTunnel.Status.GlobalEgressIP = GlobalEgressIP
+			GwExternIP, err := r.getGwExternIP(podnext)
+			if err != nil {
+				return ctrl.Result{}, err
+			}
+			vpcTunnel.Status.InternalIP = GwExternIP
+
+			err = r.execCommandInPod(podnext.Name, podnext.Namespace, "vpc-nat-gw", genCreateTunnelCmd(vpcTunnel))
+			if err != nil {
+				return ctrl.Result{}, err
+			}
 			err = r.execCommandInPod(podnext.Name, podnext.Namespace, "vpc-nat-gw", genGlobalnetRoute(GlobalnetCIDR, ovnGwIP, vpcTunnel.Name, vpcTunnel.Spec.RemoteGlobalnetCIDR, GlobalEgressIP))
 			if err != nil {
 				return ctrl.Result{}, err
 			}
 
-			// statefulSet := &appsv1.StatefulSet{}
-			// err := r.Get(ctx, types.NamespacedName{Name: "vpc-nat-gw-" + vpcTunnel.Status.NatGwDp, Namespace: "kube-system"}, statefulSet) // get StatefulSet named Status.NatGwDp
-			// if err != nil {
-			// 	return ctrl.Result{}, err
-			// }
-			// // get StatefulSet Containers command  at the begin is "while true; do sleep 10000; done"
-			// oldRestartCommand := statefulSet.Spec.Template.Spec.Containers[0].Args[1]
-			// // delete create tunnel command  in statefulSet Containers
-			// comd := genLastCreateTunnelCmd(vpcTunnel)
-			// index := strings.Index(oldRestartCommand, comd)
-			// newRestartCommand := oldRestartCommand[:index] + oldRestartCommand[index+len(comd):]
-			// statefulSet.Spec.Template.Spec.Containers[0].Args[1] = newRestartCommand
-
-			// statefulSet = &appsv1.StatefulSet{}
-			// err = r.Get(ctx, types.NamespacedName{Name: "vpc-nat-gw-" + vpcTunnel.Spec.NatGwDp, Namespace: "kube-system"}, statefulSet) // get StatefulSet named Spec.NatGwDp
-			// if err != nil {
-			// 	return ctrl.Result{}, err
-			// }
-			// oldRestartCommand = statefulSet.Spec.Template.Spec.Containers[0].Args[1]
-			// // insert create tunnel command at head  in statefulSet Containers
-			// newRestartCommand = genCreateTunnelCmd(vpcTunnel) + oldRestartCommand
-			// statefulSet.Spec.Template.Spec.Containers[0].Args[1] = newRestartCommand
-
-			vpcTunnel.Status.InternalIP = vpcTunnel.Spec.InternalIP
 			vpcTunnel.Status.RemoteIP = vpcTunnel.Spec.RemoteIP
 			vpcTunnel.Status.InterfaceAddr = vpcTunnel.Spec.InterfaceAddr
 			vpcTunnel.Status.NatGwDp = vpcTunnel.Spec.NatGwDp
@@ -436,19 +401,6 @@ func (r *VpcNatTunnelReconciler) handleDelete(ctx context.Context, vpcTunnel *ku
 		if err != nil {
 			return ctrl.Result{}, err
 		}
-
-		// statefulSet := &appsv1.StatefulSet{}
-		// err := r.Get(ctx, types.NamespacedName{Name: "vpc-nat-gw-" + vpcTunnel.Spec.NatGwDp, Namespace: "kube-system"}, statefulSet) // get StatefulSet named Status.NatGwDp
-		// if err != nil {
-		// 	return ctrl.Result{}, err
-		// }
-		// // get StatefulSet Containers command  at the begin is "while true; do sleep 10000; done"
-		// oldRestartCommand := statefulSet.Spec.Template.Spec.Containers[0].Args[1]
-		// // delete create tunnel command  in statefulSet Containers
-		// comd := genLastCreateTunnelCmd(vpcTunnel)
-		// index := strings.Index(oldRestartCommand, comd)
-		// newRestartCommand := oldRestartCommand[:index] + oldRestartCommand[index+len(comd):]
-		// statefulSet.Spec.Template.Spec.Containers[0].Args[1] = newRestartCommand
 
 		controllerutil.RemoveFinalizer(vpcTunnel, "tunnel.finalizer.ustc.io")
 		err = r.Update(ctx, vpcTunnel)

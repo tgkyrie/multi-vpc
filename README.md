@@ -59,7 +59,7 @@ metadata:
   name: ovn-gre0
   namespace: ns2
 spec:
-  internalIp: "172.16.50.84" #vpc网关实体网络ip
+  # internalIp: "172.16.50.84" #vpc网关实体网络ip
   remoteIp: "172.16.50.122" #互联的对端vpc网关实体网络ip
   interfaceAddr: "10.0.0.1/24" #隧道地址
   natGwDp: "vpc2-net1-gateway" #vpc网关名字
