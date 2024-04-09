@@ -20,6 +20,7 @@ import (
 	"crypto/tls"
 	"flag"
 	ovn "github.com/kubeovn/kube-ovn/pkg/apis/kubeovn/v1"
+	Submariner "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"os"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
@@ -51,6 +52,8 @@ func init() {
 	utilruntime.Must(kubeovnv1.AddToScheme(scheme))
 
 	utilruntime.Must(ovn.AddToScheme(scheme))
+
+	utilruntime.Must(Submariner.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
 
