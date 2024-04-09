@@ -1,5 +1,7 @@
 # multi-vpc
-在kube-ovn vpc-dns deployment上自动创建和维护Dns转发的operator
+### operator 功能
+- 在kube-ovn vpc-dns deployment上自动创建和维护Dns转发
+- 在kube-ovn vpc网关上自动创建和维护隧道
 
 ## Getting Started
 
@@ -42,7 +44,7 @@ sudo ctr -n k8s.io image import myimage.tar
 kubectl apply -f deploy.yaml
 ```
 
-### 测试
+### 测试 DNS 转发
 
 新建 dns.yaml
 ```yaml
@@ -63,3 +65,32 @@ kubectl apply -f dns.yaml
 kubectl delete -f dns.yaml
 ```
 登陆vpc-dns deployment, 可以看到路由已被删除
+
+
+### 测试 网关隧道
+新建 tunnel.yaml
+
+```yaml
+apiVersion: "kubeovn.ustc.io/v1"
+kind: VpcNatTunnel
+metadata:
+  name: ovn-gre0
+  namespace: ns1
+spec:
+  internalIp: "10.10.0.36" #vpc网关实体网络ip
+  remoteIp: "10.10.0.21" #互联的对端vpc网关实体网络ip
+  interfaceAddr: "10.100.0.1/24" #隧道地址
+  natGwDp: "gw1" #vpc网关名字
+
+  GlobalnetCIDR: "242.1.0.0/16"
+  remoteGlobalnetCIDR: "242.0.0.0/16"
+
+```
+```sh
+kubectl apply -f tunnel.yaml
+```
+登陆vpc网关pod，可以观察到隧道创建
+```sh
+kubectl delete -f tunnel.yaml
+```
+登陆vpc网关pod,可以观察到隧道被删除
