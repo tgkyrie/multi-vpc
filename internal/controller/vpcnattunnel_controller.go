@@ -79,6 +79,7 @@ func (r *VpcNatTunnelReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 }
 
+// Pod 内执行相关操作
 func (r *VpcNatTunnelReconciler) execCommandInPod(podName, namespace, containerName, command string) error {
 	clientset, err := kubernetes.NewForConfig(r.Config)
 	if err != nil {
@@ -133,10 +134,12 @@ func (r *VpcNatTunnelReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
+// 通过 Vpc-Gateway 的 CR 名称得到其 Pod Label 名称
 func GenNatGwStsName(name string) string {
 	return fmt.Sprintf("vpc-nat-gw-%s", name)
 }
 
+// 通过 Vpc-Gateway Pod Label 名称获取Vpc-Gateway Pod
 func (r *VpcNatTunnelReconciler) getNatGwPod(name string) (*corev1.Pod, error) {
 	podList := &corev1.PodList{}
 	matchLabels := map[string]string{"app": GenNatGwStsName(name), "ovn.kubernetes.io/vpc-nat-gw": "true"}
@@ -163,6 +166,7 @@ func (r *VpcNatTunnelReconciler) getNatGwPod(name string) (*corev1.Pod, error) {
 	return &pods[0], nil
 }
 
+// 生成创建隧道命令
 func genCreateTunnelCmd(tunnel *kubeovnv1.VpcNatTunnel) string {
 	createCmd := fmt.Sprintf("ip tunnel add %s mode gre remote %s local %s ttl 255", tunnel.Name, tunnel.Spec.RemoteIP, tunnel.Spec.InternalIP)
 	setUpCmd := fmt.Sprintf("ip link set %s up", tunnel.Name)
@@ -170,13 +174,7 @@ func genCreateTunnelCmd(tunnel *kubeovnv1.VpcNatTunnel) string {
 	return createCmd + ";" + setUpCmd + ";" + addrCmd
 }
 
-// func genLastCreateTunnelCmd(tunnel *kubeovnv1.VpcNatTunnel) string {
-// 	createCmd := fmt.Sprintf("ip tunnel add %s mode gre remote %s local %s ttl 255", tunnel.Name, tunnel.Status.RemoteIP, tunnel.Status.InternalIP)
-// 	setUpCmd := fmt.Sprintf("ip link set %s up", tunnel.Name)
-// 	addrCmd := fmt.Sprintf("ip addr add %s dev %s", tunnel.Status.InterfaceAddr, tunnel.Name)
-// 	return createCmd + ";" + setUpCmd + ";" + addrCmd
-// }
-
+// 生成删除隧道命令
 func genDeleteTunnelCmd(tunnel *kubeovnv1.VpcNatTunnel) string {
 	delCmd := fmt.Sprintf("ip tunnel del %s", tunnel.Name)
 	return delCmd
@@ -190,7 +188,7 @@ func (r *VpcNatTunnelReconciler) handleCreateOrUpdate(ctx context.Context, vpcTu
 			return ctrl.Result{}, err
 		}
 	}
-
+	// 未初始化，即隧道之前没有建立
 	if !vpcTunnel.Status.Initialized {
 		// add tunnel
 		podnext, err := r.getNatGwPod(vpcTunnel.Spec.NatGwDp) // find pod named Spec.NatGwDp
@@ -201,28 +199,20 @@ func (r *VpcNatTunnelReconciler) handleCreateOrUpdate(ctx context.Context, vpcTu
 		if err != nil {
 			return ctrl.Result{}, err
 		}
-
-		// statefulSet := &appsv1.StatefulSet{}
-		// err = r.Get(ctx, types.NamespacedName{Name: "vpc-nat-gw-" + vpcTunnel.Spec.NatGwDp, Namespace: "kube-system"}, statefulSet) // get StatefulSet named Spec.NatGwDp
-		// if err != nil {
-		// 	return ctrl.Result{}, err
-		// }
-		// // get StatefulSet Containers command  at the begin is "while true; do sleep 10000; done"
-		// oldRestartCommand := statefulSet.Spec.Template.Spec.Containers[0].Args[1]
-		// // insert create tunnel command at head  in statefulSet Containers
-		// newRestartCommand := genCreateTunnelCmd(vpcTunnel) + oldRestartCommand
-		// statefulSet.Spec.Template.Spec.Containers[0].Args[1] = newRestartCommand
-
 		vpcTunnel.Status.Initialized = true
 		vpcTunnel.Status.InternalIP = vpcTunnel.Spec.InternalIP
 		vpcTunnel.Status.RemoteIP = vpcTunnel.Spec.RemoteIP
 		vpcTunnel.Status.InterfaceAddr = vpcTunnel.Spec.InterfaceAddr
 		vpcTunnel.Status.NatGwDp = vpcTunnel.Spec.NatGwDp
-		r.Status().Update(ctx, vpcTunnel)
+		err = r.Status().Update(ctx, vpcTunnel)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
 
 	} else if vpcTunnel.Status.Initialized && (vpcTunnel.Status.InternalIP != vpcTunnel.Spec.InternalIP || vpcTunnel.Status.RemoteIP != vpcTunnel.Spec.RemoteIP ||
 		vpcTunnel.Status.InterfaceAddr != vpcTunnel.Spec.InterfaceAddr || vpcTunnel.Status.NatGwDp != vpcTunnel.Spec.NatGwDp ||
 		vpcTunnel.Status.GlobalnetCIDR != vpcTunnel.Spec.GlobalnetCIDR || vpcTunnel.Status.RemoteGlobalnetCIDR != vpcTunnel.Spec.RemoteGlobalnetCIDR) {
+		// CR更新，但还是在原有 Vpc-Gateway Pod上操作
 		if vpcTunnel.Status.NatGwDp == vpcTunnel.Spec.NatGwDp {
 			podnext, err := r.getNatGwPod(vpcTunnel.Spec.NatGwDp) // find pod named Spec.NatGwDp
 			if err != nil {
@@ -236,26 +226,15 @@ func (r *VpcNatTunnelReconciler) handleCreateOrUpdate(ctx context.Context, vpcTu
 			if err != nil {
 				return ctrl.Result{}, err
 			}
-
-			// statefulSet := &appsv1.StatefulSet{}
-			// err := r.Get(ctx, types.NamespacedName{Name: "vpc-nat-gw-" + vpcTunnel.Status.NatGwDp, Namespace: "kube-system"}, statefulSet) // get StatefulSet named Status.NatGwDp
-			// if err != nil {
-			// 	return ctrl.Result{}, err
-			// }
-			// // get StatefulSet Containers command  at the begin is "while true; do sleep 10000; done"
-			// oldRestartCommand := statefulSet.Spec.Template.Spec.Containers[0].Args[1]
-			// // delete create tunnel command  in statefulSet Containers
-			// comd := genLastCreateTunnelCmd(vpcTunnel)
-			// index := strings.Index(oldRestartCommand, comd)
-			// newRestartCommand := genCreateTunnelCmd(vpcTunnel) + oldRestartCommand[:index] + oldRestartCommand[index+len(comd):]
-			// statefulSet.Spec.Template.Spec.Containers[0].Args[1] = newRestartCommand
-
 			vpcTunnel.Status.InternalIP = vpcTunnel.Spec.InternalIP
 			vpcTunnel.Status.RemoteIP = vpcTunnel.Spec.RemoteIP
 			vpcTunnel.Status.InterfaceAddr = vpcTunnel.Spec.InterfaceAddr
 			vpcTunnel.Status.NatGwDp = vpcTunnel.Spec.NatGwDp
-			r.Status().Update(ctx, vpcTunnel)
-
+			err = r.Status().Update(ctx, vpcTunnel)
+			if err != nil {
+				return ctrl.Result{}, err
+			}
+			//更新CR导致在其他 Vpc-Gateway Pod上操作，原有Pod删除隧道，其他Pod建立隧道
 		} else { // change the gw pod
 			// update
 			podlast, err := r.getNatGwPod(vpcTunnel.Status.NatGwDp) // find pod named Status.NatGwDp
@@ -274,35 +253,14 @@ func (r *VpcNatTunnelReconciler) handleCreateOrUpdate(ctx context.Context, vpcTu
 			if err != nil {
 				return ctrl.Result{}, err
 			}
-
-			// statefulSet := &appsv1.StatefulSet{}
-			// err := r.Get(ctx, types.NamespacedName{Name: "vpc-nat-gw-" + vpcTunnel.Status.NatGwDp, Namespace: "kube-system"}, statefulSet) // get StatefulSet named Status.NatGwDp
-			// if err != nil {
-			// 	return ctrl.Result{}, err
-			// }
-			// // get StatefulSet Containers command  at the begin is "while true; do sleep 10000; done"
-			// oldRestartCommand := statefulSet.Spec.Template.Spec.Containers[0].Args[1]
-			// // delete create tunnel command  in statefulSet Containers
-			// comd := genLastCreateTunnelCmd(vpcTunnel)
-			// index := strings.Index(oldRestartCommand, comd)
-			// newRestartCommand := oldRestartCommand[:index] + oldRestartCommand[index+len(comd):]
-			// statefulSet.Spec.Template.Spec.Containers[0].Args[1] = newRestartCommand
-
-			// statefulSet = &appsv1.StatefulSet{}
-			// err = r.Get(ctx, types.NamespacedName{Name: "vpc-nat-gw-" + vpcTunnel.Spec.NatGwDp, Namespace: "kube-system"}, statefulSet) // get StatefulSet named Spec.NatGwDp
-			// if err != nil {
-			// 	return ctrl.Result{}, err
-			// }
-			// oldRestartCommand = statefulSet.Spec.Template.Spec.Containers[0].Args[1]
-			// // insert create tunnel command at head  in statefulSet Containers
-			// newRestartCommand = genCreateTunnelCmd(vpcTunnel) + oldRestartCommand
-			// statefulSet.Spec.Template.Spec.Containers[0].Args[1] = newRestartCommand
-
 			vpcTunnel.Status.InternalIP = vpcTunnel.Spec.InternalIP
 			vpcTunnel.Status.RemoteIP = vpcTunnel.Spec.RemoteIP
 			vpcTunnel.Status.InterfaceAddr = vpcTunnel.Spec.InterfaceAddr
 			vpcTunnel.Status.NatGwDp = vpcTunnel.Spec.NatGwDp
-			r.Status().Update(ctx, vpcTunnel)
+			err = r.Status().Update(ctx, vpcTunnel)
+			if err != nil {
+				return ctrl.Result{}, err
+			}
 		}
 	}
 	return ctrl.Result{}, nil
@@ -319,19 +277,6 @@ func (r *VpcNatTunnelReconciler) handleDelete(ctx context.Context, vpcTunnel *ku
 		if err != nil {
 			return ctrl.Result{}, err
 		}
-
-		// statefulSet := &appsv1.StatefulSet{}
-		// err := r.Get(ctx, types.NamespacedName{Name: "vpc-nat-gw-" + vpcTunnel.Spec.NatGwDp, Namespace: "kube-system"}, statefulSet) // get StatefulSet named Status.NatGwDp
-		// if err != nil {
-		// 	return ctrl.Result{}, err
-		// }
-		// // get StatefulSet Containers command  at the begin is "while true; do sleep 10000; done"
-		// oldRestartCommand := statefulSet.Spec.Template.Spec.Containers[0].Args[1]
-		// // delete create tunnel command  in statefulSet Containers
-		// comd := genLastCreateTunnelCmd(vpcTunnel)
-		// index := strings.Index(oldRestartCommand, comd)
-		// newRestartCommand := oldRestartCommand[:index] + oldRestartCommand[index+len(comd):]
-		// statefulSet.Spec.Template.Spec.Containers[0].Args[1] = newRestartCommand
 
 		controllerutil.RemoveFinalizer(vpcTunnel, "tunnel.finalizer.ustc.io")
 		err = r.Update(ctx, vpcTunnel)
