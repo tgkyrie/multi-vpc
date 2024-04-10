@@ -39,24 +39,19 @@ spec:
           spec:
             description: VpcNatTunnelSpec defines the desired state of VpcNatTunnel
             properties:
-              GlobalnetCIDR:
-                type: string
               interfaceAddr:
-                type: string
-              internalIp:
-                description: Foo is an example field of VpcNatTunnel. Edit vpcnattunnel_types.go
-                  to remove/update
                 type: string
               natGwDp:
                 type: string
               remoteGlobalnetCIDR:
                 type: string
               remoteIp:
+                description: |-
+                  Foo is an example field of VpcNatTunnel. Edit vpcnattunnel_types.go to remove/update
+                  InternalIP    string `json:"internalIp"`
                 type: string
             required:
-            - GlobalnetCIDR
             - interfaceAddr
-            - internalIp
             - natGwDp
             - remoteGlobalnetCIDR
             - remoteIp
@@ -64,7 +59,11 @@ spec:
           status:
             description: VpcNatTunnelStatus defines the observed state of VpcNatTunnel
             properties:
-              GlobalnetCIDR:
+              globalEgressIP:
+                items:
+                  type: string
+                type: array
+              globalnetCIDR:
                 type: string
               initialized:
                 description: |-
@@ -77,16 +76,20 @@ spec:
                 type: string
               natGwDp:
                 type: string
+              ovnGwIP:
+                type: string
               remoteGlobalnetCIDR:
                 type: string
               remoteIp:
                 type: string
             required:
-            - GlobalnetCIDR
+            - globalEgressIP
+            - globalnetCIDR
             - initialized
             - interfaceAddr
             - internalIp
             - natGwDp
+            - ovnGwIP
             - remoteGlobalnetCIDR
             - remoteIp
             type: object

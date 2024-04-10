@@ -24,6 +24,8 @@ import (
 	"time"
 
 	// appsv1 "k8s.io/api/apps/v1"
+
+	Submariner "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -52,6 +54,8 @@ type VpcNatTunnelReconciler struct {
 //+kubebuilder:rbac:groups=kubeovn.ustc.io,resources=vpcnattunnels/finalizers,verbs=update
 //+kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=core,resources=pods/exec,verbs=get;create
+//+kubebuilder:rbac:groups=submariner.io,resources=gateways,verbs=get;list;watch;
+//+kubebuilder:rbac:groups=submariner.io,resources=clusterglobalegressips,verbs=get;list;watch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -79,7 +83,6 @@ func (r *VpcNatTunnelReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 }
 
-// Pod 内执行相关操作
 func (r *VpcNatTunnelReconciler) execCommandInPod(podName, namespace, containerName, command string) error {
 	clientset, err := kubernetes.NewForConfig(r.Config)
 	if err != nil {
@@ -134,12 +137,10 @@ func (r *VpcNatTunnelReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-// 通过 Vpc-Gateway 的 CR 名称得到其 Pod Label 名称
 func GenNatGwStsName(name string) string {
 	return fmt.Sprintf("vpc-nat-gw-%s", name)
 }
 
-// 通过 Vpc-Gateway Pod Label 名称获取Vpc-Gateway Pod
 func (r *VpcNatTunnelReconciler) getNatGwPod(name string) (*corev1.Pod, error) {
 	podList := &corev1.PodList{}
 	matchLabels := map[string]string{"app": GenNatGwStsName(name), "ovn.kubernetes.io/vpc-nat-gw": "true"}
@@ -166,15 +167,81 @@ func (r *VpcNatTunnelReconciler) getNatGwPod(name string) (*corev1.Pod, error) {
 	return &pods[0], nil
 }
 
-// 生成创建隧道命令
+func (r *VpcNatTunnelReconciler) getGlobalnetCIDR() (string, error) {
+	submGwlist := &Submariner.GatewayList{}
+	err := r.List(context.TODO(), submGwlist, client.InNamespace("submariner-operator"))
+	if err != nil {
+		return "", err
+	}
+
+	submGws := submGwlist.Items
+	switch {
+	case len(submGws) == 0:
+		return "", fmt.Errorf("no Submariner.Gateway")
+	default:
+		return submGws[0].Status.LocalEndpoint.Subnets[0], nil
+	}
+}
+
+func (r *VpcNatTunnelReconciler) getGlobalEgressIP() ([]string, error) {
+	submGlobalEgressIP := &Submariner.ClusterGlobalEgressIP{}
+	err := r.Get(context.TODO(), client.ObjectKey{Name: "cluster-egress.submariner.io"}, submGlobalEgressIP)
+	if err != nil {
+		return nil, err
+	}
+	return submGlobalEgressIP.Status.AllocatedIPs, nil
+}
+
+func (r *VpcNatTunnelReconciler) getGwExternIP(pod *corev1.Pod) (string, error) {
+	if ExternIP, ok := pod.Annotations["ovn-vpc-external-network.kube-system.kubernetes.io/ip_address"]; ok {
+		return ExternIP, nil
+	} else {
+		return "", fmt.Errorf("no ovn-vpc-external-network ip")
+	}
+}
+
+func (r *VpcNatTunnelReconciler) getPodGwIP(pod *corev1.Pod) (string, error) {
+	if gw, ok := pod.Annotations["ovn.kubernetes.io/gateway"]; ok {
+		return gw, nil
+	} else {
+		return "", fmt.Errorf("no ovn gateway")
+	}
+}
+
 func genCreateTunnelCmd(tunnel *kubeovnv1.VpcNatTunnel) string {
-	createCmd := fmt.Sprintf("ip tunnel add %s mode gre remote %s local %s ttl 255", tunnel.Name, tunnel.Spec.RemoteIP, tunnel.Spec.InternalIP)
+	createCmd := fmt.Sprintf("ip tunnel add %s mode gre remote %s local %s ttl 255", tunnel.Name, tunnel.Spec.RemoteIP, tunnel.Status.InternalIP)
 	setUpCmd := fmt.Sprintf("ip link set %s up", tunnel.Name)
 	addrCmd := fmt.Sprintf("ip addr add %s dev %s", tunnel.Spec.InterfaceAddr, tunnel.Name)
 	return createCmd + ";" + setUpCmd + ";" + addrCmd
 }
 
-// 生成删除隧道命令
+func genGlobalnetRoute(GlobalnetCIDR string, ovnGwIP string, RemoteGlobalnetCIDR string, tunnelName string, GlobalEgressIP []string) string {
+	// 入流量转发给ovn网关(逻辑交换机)
+	InFlowRoute := fmt.Sprintf("ip route add %s via %s dev eth0", GlobalnetCIDR, ovnGwIP)
+	// 跨集群流量路由至隧道
+	OutFlowRoute := fmt.Sprintf("ip route add %s dev %s", RemoteGlobalnetCIDR, tunnelName)
+
+	// 创建snat，将跨集群流量数据包源地址修改为ClusterGlobalEgressIP(globalnet cidr前8个)
+	SNAT := fmt.Sprintf("iptables -t nat -A POSTROUTING -d %s -j SNAT --to-source %s-%s", RemoteGlobalnetCIDR, GlobalEgressIP[0], GlobalEgressIP[len(GlobalEgressIP)-1])
+	return InFlowRoute + ";" + OutFlowRoute + ";" + SNAT
+	// return InFlowRoute
+}
+
+func genDelGlobalnetRoute(GlobalnetCIDR string, ovnGwIP string, RemoteGlobalnetCIDR string, tunnelName string, GlobalEgressIP []string) string {
+	InFlowRoute := fmt.Sprintf("ip route del %s via %s dev eth0", GlobalnetCIDR, ovnGwIP)
+	OutFlowRoute := fmt.Sprintf("ip route del %s dev %s", RemoteGlobalnetCIDR, tunnelName)
+
+	SNAT := fmt.Sprintf("iptables -t nat -D POSTROUTING -d %s -j SNAT --to-source %s-%s", RemoteGlobalnetCIDR, GlobalEgressIP[0], GlobalEgressIP[len(GlobalEgressIP)-1])
+	return InFlowRoute + ";" + OutFlowRoute + ";" + SNAT
+}
+
+// func genLastCreateTunnelCmd(tunnel *kubeovnv1.VpcNatTunnel) string {
+// 	createCmd := fmt.Sprintf("ip tunnel add %s mode gre remote %s local %s ttl 255", tunnel.Name, tunnel.Status.RemoteIP, tunnel.Status.InternalIP)
+// 	setUpCmd := fmt.Sprintf("ip link set %s up", tunnel.Name)
+// 	addrCmd := fmt.Sprintf("ip addr add %s dev %s", tunnel.Status.InterfaceAddr, tunnel.Name)
+// 	return createCmd + ";" + setUpCmd + ";" + addrCmd
+// }
+
 func genDeleteTunnelCmd(tunnel *kubeovnv1.VpcNatTunnel) string {
 	delCmd := fmt.Sprintf("ip tunnel del %s", tunnel.Name)
 	return delCmd
@@ -188,33 +255,60 @@ func (r *VpcNatTunnelReconciler) handleCreateOrUpdate(ctx context.Context, vpcTu
 			return ctrl.Result{}, err
 		}
 	}
-	// 未初始化，即隧道之前没有建立
+
 	if !vpcTunnel.Status.Initialized {
 		// add tunnel
 		podnext, err := r.getNatGwPod(vpcTunnel.Spec.NatGwDp) // find pod named Spec.NatGwDp
 		if err != nil {
 			return ctrl.Result{}, err
 		}
+
+		// find local cluster GlobalnetCIDR
+		GlobalnetCIDR, err := r.getGlobalnetCIDR()
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		vpcTunnel.Status.GlobalnetCIDR = GlobalnetCIDR
+		ovnGwIP, err := r.getPodGwIP(podnext)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		vpcTunnel.Status.OvnGwIP = ovnGwIP
+		GlobalEgressIP, err := r.getGlobalEgressIP()
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		vpcTunnel.Status.GlobalEgressIP = GlobalEgressIP
+		GwExternIP, err := r.getGwExternIP(podnext)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		vpcTunnel.Status.InternalIP = GwExternIP
+
 		err = r.execCommandInPod(podnext.Name, podnext.Namespace, "vpc-nat-gw", genCreateTunnelCmd(vpcTunnel))
 		if err != nil {
 			return ctrl.Result{}, err
 		}
-		vpcTunnel.Status.Initialized = true
-		vpcTunnel.Status.InternalIP = vpcTunnel.Spec.InternalIP
-		vpcTunnel.Status.RemoteIP = vpcTunnel.Spec.RemoteIP
-		vpcTunnel.Status.InterfaceAddr = vpcTunnel.Spec.InterfaceAddr
-		vpcTunnel.Status.NatGwDp = vpcTunnel.Spec.NatGwDp
-		err = r.Status().Update(ctx, vpcTunnel)
+		err = r.execCommandInPod(podnext.Name, podnext.Namespace, "vpc-nat-gw", genGlobalnetRoute(GlobalnetCIDR, ovnGwIP, vpcTunnel.Spec.RemoteGlobalnetCIDR, vpcTunnel.Name, GlobalEgressIP))
 		if err != nil {
 			return ctrl.Result{}, err
 		}
 
-	} else if vpcTunnel.Status.Initialized && (vpcTunnel.Status.InternalIP != vpcTunnel.Spec.InternalIP || vpcTunnel.Status.RemoteIP != vpcTunnel.Spec.RemoteIP ||
-		vpcTunnel.Status.InterfaceAddr != vpcTunnel.Spec.InterfaceAddr || vpcTunnel.Status.NatGwDp != vpcTunnel.Spec.NatGwDp ||
-		vpcTunnel.Status.GlobalnetCIDR != vpcTunnel.Spec.GlobalnetCIDR || vpcTunnel.Status.RemoteGlobalnetCIDR != vpcTunnel.Spec.RemoteGlobalnetCIDR) {
-		// CR更新，但还是在原有 Vpc-Gateway Pod上操作
-		if vpcTunnel.Status.NatGwDp == vpcTunnel.Spec.NatGwDp {
+		vpcTunnel.Status.Initialized = true
+		vpcTunnel.Status.RemoteIP = vpcTunnel.Spec.RemoteIP
+		vpcTunnel.Status.RemoteGlobalnetCIDR = vpcTunnel.Spec.RemoteGlobalnetCIDR
+		vpcTunnel.Status.InterfaceAddr = vpcTunnel.Spec.InterfaceAddr
+		vpcTunnel.Status.NatGwDp = vpcTunnel.Spec.NatGwDp
+		r.Status().Update(ctx, vpcTunnel)
+
+	} else if vpcTunnel.Status.Initialized && (vpcTunnel.Status.RemoteIP != vpcTunnel.Spec.RemoteIP || vpcTunnel.Status.InterfaceAddr != vpcTunnel.Spec.InterfaceAddr ||
+		vpcTunnel.Status.NatGwDp != vpcTunnel.Spec.NatGwDp || vpcTunnel.Status.RemoteGlobalnetCIDR != vpcTunnel.Spec.RemoteGlobalnetCIDR) {
+		if vpcTunnel.Status.NatGwDp == vpcTunnel.Spec.NatGwDp { // NatGwDp not change
 			podnext, err := r.getNatGwPod(vpcTunnel.Spec.NatGwDp) // find pod named Spec.NatGwDp
+			if err != nil {
+				return ctrl.Result{}, err
+			}
+			err = r.execCommandInPod(podnext.Name, podnext.Namespace, "vpc-nat-gw", genDelGlobalnetRoute(vpcTunnel.Status.GlobalnetCIDR, vpcTunnel.Status.OvnGwIP, vpcTunnel.Status.RemoteGlobalnetCIDR, vpcTunnel.Name, vpcTunnel.Status.GlobalEgressIP))
 			if err != nil {
 				return ctrl.Result{}, err
 			}
@@ -226,18 +320,24 @@ func (r *VpcNatTunnelReconciler) handleCreateOrUpdate(ctx context.Context, vpcTu
 			if err != nil {
 				return ctrl.Result{}, err
 			}
-			vpcTunnel.Status.InternalIP = vpcTunnel.Spec.InternalIP
-			vpcTunnel.Status.RemoteIP = vpcTunnel.Spec.RemoteIP
-			vpcTunnel.Status.InterfaceAddr = vpcTunnel.Spec.InterfaceAddr
-			vpcTunnel.Status.NatGwDp = vpcTunnel.Spec.NatGwDp
-			err = r.Status().Update(ctx, vpcTunnel)
+			err = r.execCommandInPod(podnext.Name, podnext.Namespace, "vpc-nat-gw", genGlobalnetRoute(vpcTunnel.Status.GlobalnetCIDR, vpcTunnel.Status.OvnGwIP, vpcTunnel.Spec.RemoteGlobalnetCIDR, vpcTunnel.Name, vpcTunnel.Status.GlobalEgressIP))
 			if err != nil {
 				return ctrl.Result{}, err
 			}
-			//更新CR导致在其他 Vpc-Gateway Pod上操作，原有Pod删除隧道，其他Pod建立隧道
+
+			vpcTunnel.Status.RemoteIP = vpcTunnel.Spec.RemoteIP
+			vpcTunnel.Status.RemoteGlobalnetCIDR = vpcTunnel.Spec.RemoteGlobalnetCIDR
+			vpcTunnel.Status.InterfaceAddr = vpcTunnel.Spec.InterfaceAddr
+			vpcTunnel.Status.NatGwDp = vpcTunnel.Spec.NatGwDp
+			r.Status().Update(ctx, vpcTunnel)
+
 		} else { // change the gw pod
 			// update
 			podlast, err := r.getNatGwPod(vpcTunnel.Status.NatGwDp) // find pod named Status.NatGwDp
+			if err != nil {
+				return ctrl.Result{}, err
+			}
+			err = r.execCommandInPod(podlast.Name, podlast.Namespace, "vpc-nat-gw", genDelGlobalnetRoute(vpcTunnel.Status.GlobalnetCIDR, vpcTunnel.Status.OvnGwIP, vpcTunnel.Spec.RemoteGlobalnetCIDR, vpcTunnel.Name, vpcTunnel.Status.GlobalEgressIP))
 			if err != nil {
 				return ctrl.Result{}, err
 			}
@@ -245,22 +345,48 @@ func (r *VpcNatTunnelReconciler) handleCreateOrUpdate(ctx context.Context, vpcTu
 			if err != nil {
 				return ctrl.Result{}, err
 			}
+
 			podnext, err := r.getNatGwPod(vpcTunnel.Spec.NatGwDp) // find pod named Status.NatGwDp
 			if err != nil {
 				return ctrl.Result{}, err
 			}
+
+			// find local cluster GlobalnetCIDR
+			GlobalnetCIDR, err := r.getGlobalnetCIDR()
+			if err != nil {
+				return ctrl.Result{}, err
+			}
+			vpcTunnel.Status.GlobalnetCIDR = GlobalnetCIDR
+			ovnGwIP, err := r.getPodGwIP(podnext)
+			if err != nil {
+				return ctrl.Result{}, err
+			}
+			vpcTunnel.Status.OvnGwIP = ovnGwIP
+			GlobalEgressIP, err := r.getGlobalEgressIP()
+			if err != nil {
+				return ctrl.Result{}, err
+			}
+			vpcTunnel.Status.GlobalEgressIP = GlobalEgressIP
+			GwExternIP, err := r.getGwExternIP(podnext)
+			if err != nil {
+				return ctrl.Result{}, err
+			}
+			vpcTunnel.Status.InternalIP = GwExternIP
+
 			err = r.execCommandInPod(podnext.Name, podnext.Namespace, "vpc-nat-gw", genCreateTunnelCmd(vpcTunnel))
 			if err != nil {
 				return ctrl.Result{}, err
 			}
-			vpcTunnel.Status.InternalIP = vpcTunnel.Spec.InternalIP
-			vpcTunnel.Status.RemoteIP = vpcTunnel.Spec.RemoteIP
-			vpcTunnel.Status.InterfaceAddr = vpcTunnel.Spec.InterfaceAddr
-			vpcTunnel.Status.NatGwDp = vpcTunnel.Spec.NatGwDp
-			err = r.Status().Update(ctx, vpcTunnel)
+			err = r.execCommandInPod(podnext.Name, podnext.Namespace, "vpc-nat-gw", genGlobalnetRoute(GlobalnetCIDR, ovnGwIP, vpcTunnel.Spec.RemoteGlobalnetCIDR, vpcTunnel.Name, GlobalEgressIP))
 			if err != nil {
 				return ctrl.Result{}, err
 			}
+
+			vpcTunnel.Status.RemoteIP = vpcTunnel.Spec.RemoteIP
+			vpcTunnel.Status.RemoteGlobalnetCIDR = vpcTunnel.Spec.RemoteGlobalnetCIDR
+			vpcTunnel.Status.InterfaceAddr = vpcTunnel.Spec.InterfaceAddr
+			vpcTunnel.Status.NatGwDp = vpcTunnel.Spec.NatGwDp
+			r.Status().Update(ctx, vpcTunnel)
 		}
 	}
 	return ctrl.Result{}, nil
@@ -270,6 +396,10 @@ func (r *VpcNatTunnelReconciler) handleDelete(ctx context.Context, vpcTunnel *ku
 	if containsString(vpcTunnel.ObjectMeta.Finalizers, "tunnel.finalizer.ustc.io") {
 		// TODO: implement clean up the GRE tunnel before deletion
 		pod, err := r.getNatGwPod(vpcTunnel.Spec.NatGwDp)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		err = r.execCommandInPod(pod.Name, pod.Namespace, "vpc-nat-gw", genDelGlobalnetRoute(vpcTunnel.Status.GlobalnetCIDR, vpcTunnel.Status.OvnGwIP, vpcTunnel.Status.RemoteGlobalnetCIDR, vpcTunnel.Name, vpcTunnel.Status.GlobalEgressIP))
 		if err != nil {
 			return ctrl.Result{}, err
 		}

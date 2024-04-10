@@ -69,6 +69,7 @@ func (r *GatewayInformer) Start(ctx context.Context) error {
 			if statefulSet.Status.AvailableReplicas == 1 {
 				for _, vpcNatTunnel := range vpcNatTunnelList.Items {
 					// 更新 vpcNatTunnel 状态
+					klog.Info(vpcNatTunnel)
 				}
 			}
 		},
@@ -92,12 +93,14 @@ func (r *GatewayInformer) Start(ctx context.Context) error {
 			if oldStatefulSet.Status.AvailableReplicas == 0 && newStatefulSet.Status.AvailableReplicas == 1 {
 				for _, vpcNatTunnel := range vpcNatTunnelList.Items {
 					// 更新 vpcNatTunnel 状态
+					klog.Info(vpcNatTunnel)
 				}
 			}
 			// Vpc-Gateway 节点宕掉， 可用 pod 从 1 到 0
 			if oldStatefulSet.Status.AvailableReplicas == 1 && newStatefulSet.Status.AvailableReplicas == 0 {
 				for _, vpcNatTunnel := range vpcNatTunnelList.Items {
 					// 更新 vpcNatTunnel 状态
+					klog.Info(vpcNatTunnel)
 				}
 			}
 		},
@@ -118,6 +121,7 @@ func (r *GatewayInformer) Start(ctx context.Context) error {
 			}
 			for _, vpcNatTunnel := range vpcNatTunnelList.Items {
 				// 更新 vpcNatTunnel 状态
+				klog.Info(vpcNatTunnel)
 			}
 		},
 	})

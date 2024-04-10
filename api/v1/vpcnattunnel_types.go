@@ -29,12 +29,11 @@ type VpcNatTunnelSpec struct {
 	// Important: Run "make" to regenerate code after modifying this file
 
 	// Foo is an example field of VpcNatTunnel. Edit vpcnattunnel_types.go to remove/update
-	InternalIP    string `json:"internalIp"`
+	// InternalIP    string `json:"internalIp"`
 	RemoteIP      string `json:"remoteIp"`
 	InterfaceAddr string `json:"interfaceAddr"`
 	NatGwDp       string `json:"natGwDp"`
 
-	GlobalnetCIDR       string `json:"GlobalnetCIDR"`
 	RemoteGlobalnetCIDR string `json:"remoteGlobalnetCIDR"`
 }
 
@@ -48,8 +47,10 @@ type VpcNatTunnelStatus struct {
 	InterfaceAddr string `json:"interfaceAddr"`
 	NatGwDp       string `json:"natGwDp"`
 
-	GlobalnetCIDR       string `json:"GlobalnetCIDR"`
-	RemoteGlobalnetCIDR string `json:"remoteGlobalnetCIDR"`
+	GlobalnetCIDR       string   `json:"globalnetCIDR"`
+	RemoteGlobalnetCIDR string   `json:"remoteGlobalnetCIDR"`
+	OvnGwIP             string   `json:"ovnGwIP"`
+	GlobalEgressIP      []string `json:"globalEgressIP"`
 }
 
 //+kubebuilder:object:root=true
