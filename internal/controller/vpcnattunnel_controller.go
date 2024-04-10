@@ -19,6 +19,7 @@ package controller
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -39,14 +40,16 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	kubeovnv1 "multi-vpc/api/v1"
+	"multi-vpc/internal/tunnel/factory"
 )
 
 // VpcNatTunnelReconciler reconciles a VpcNatTunnel object
 type VpcNatTunnelReconciler struct {
 	client.Client
-	Scheme     *runtime.Scheme
-	Config     *rest.Config
-	KubeClient kubernetes.Interface
+	Scheme       *runtime.Scheme
+	Config       *rest.Config
+	KubeClient   kubernetes.Interface
+	tunnelOpFact *factory.TunnelOperationFactory
 }
 
 //+kubebuilder:rbac:groups=kubeovn.ustc.io,resources=vpcnattunnels,verbs=get;list;watch;create;update;patch;delete
@@ -133,6 +136,7 @@ func (r *VpcNatTunnelReconciler) execCommandInPod(podName, namespace, containerN
 // SetupWithManager sets up the controller with the Manager.
 func (r *VpcNatTunnelReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	r.Config = mgr.GetConfig()
+	r.tunnelOpFact = factory.NewTunnelOpFactory()
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&kubeovnv1.VpcNatTunnel{}).
 		Complete(r)
@@ -209,11 +213,12 @@ func (r *VpcNatTunnelReconciler) getPodGwIP(pod *corev1.Pod) (string, error) {
 	}
 }
 
-func genCreateTunnelCmd(tunnel *kubeovnv1.VpcNatTunnel) string {
-	createCmd := fmt.Sprintf("ip tunnel add %s mode gre remote %s local %s ttl 255", tunnel.Name, tunnel.Spec.RemoteIP, tunnel.Status.InternalIP)
-	setUpCmd := fmt.Sprintf("ip link set %s up", tunnel.Name)
-	addrCmd := fmt.Sprintf("ip addr add %s dev %s", tunnel.Spec.InterfaceAddr, tunnel.Name)
-	return createCmd + ";" + setUpCmd + ";" + addrCmd
+func (r *VpcNatTunnelReconciler) genCreateTunnelCmd(tunnel *kubeovnv1.VpcNatTunnel) string {
+	return r.tunnelOpFact.CreateTunnelOperation(tunnel).CreateCmd()
+	// createCmd := fmt.Sprintf("ip tunnel add %s mode gre remote %s local %s ttl 255", tunnel.Name, tunnel.Spec.RemoteIP, tunnel.Status.InternalIP)
+	// setUpCmd := fmt.Sprintf("ip link set %s up", tunnel.Name)
+	// addrCmd := fmt.Sprintf("ip addr add %s dev %s", tunnel.Spec.InterfaceAddr, tunnel.Name)
+	// return createCmd + ";" + setUpCmd + ";" + addrCmd
 }
 
 func genGlobalnetRoute(GlobalnetCIDR string, ovnGwIP string, RemoteGlobalnetCIDR string, tunnelName string, GlobalEgressIP []string) string {
@@ -243,9 +248,10 @@ func genDelGlobalnetRoute(GlobalnetCIDR string, ovnGwIP string, RemoteGlobalnetC
 // 	return createCmd + ";" + setUpCmd + ";" + addrCmd
 // }
 
-func genDeleteTunnelCmd(tunnel *kubeovnv1.VpcNatTunnel) string {
-	delCmd := fmt.Sprintf("ip tunnel del %s", tunnel.Name)
-	return delCmd
+func (r *VpcNatTunnelReconciler) genDeleteTunnelCmd(tunnel *kubeovnv1.VpcNatTunnel) string {
+	return r.tunnelOpFact.CreateTunnelOperation(tunnel).DeleteCmd()
+	// delCmd := fmt.Sprintf("ip tunnel del %s", tunnel.Name)
+	// return delCmd
 }
 
 func (r *VpcNatTunnelReconciler) handleCreateOrUpdate(ctx context.Context, vpcTunnel *kubeovnv1.VpcNatTunnel) (ctrl.Result, error) {
@@ -286,7 +292,7 @@ func (r *VpcNatTunnelReconciler) handleCreateOrUpdate(ctx context.Context, vpcTu
 		}
 		vpcTunnel.Status.InternalIP = GwExternIP
 
-		err = r.execCommandInPod(podnext.Name, podnext.Namespace, "vpc-nat-gw", genCreateTunnelCmd(vpcTunnel))
+		err = r.execCommandInPod(podnext.Name, podnext.Namespace, "vpc-nat-gw", r.genCreateTunnelCmd(vpcTunnel))
 		if err != nil {
 			return ctrl.Result{}, err
 		}
@@ -300,10 +306,19 @@ func (r *VpcNatTunnelReconciler) handleCreateOrUpdate(ctx context.Context, vpcTu
 		vpcTunnel.Status.RemoteGlobalnetCIDR = vpcTunnel.Spec.RemoteGlobalnetCIDR
 		vpcTunnel.Status.InterfaceAddr = vpcTunnel.Spec.InterfaceAddr
 		vpcTunnel.Status.NatGwDp = vpcTunnel.Spec.NatGwDp
+		vpcTunnel.Status.Type = vpcTunnel.Spec.Type
 		r.Status().Update(ctx, vpcTunnel)
 
 	} else if vpcTunnel.Status.Initialized && (vpcTunnel.Status.RemoteIP != vpcTunnel.Spec.RemoteIP || vpcTunnel.Status.InterfaceAddr != vpcTunnel.Spec.InterfaceAddr ||
 		vpcTunnel.Status.NatGwDp != vpcTunnel.Spec.NatGwDp || vpcTunnel.Status.RemoteGlobalnetCIDR != vpcTunnel.Spec.RemoteGlobalnetCIDR) {
+		if vpcTunnel.Status.Type != vpcTunnel.Spec.Type {
+			log.Log.Error(errors.New("tunnel type should not change"), fmt.Sprintf("tunnel :%#v\n", vpcTunnel))
+			vpcTunnel.Spec.Type = vpcTunnel.Status.Type
+			err := r.Update(ctx, vpcTunnel)
+			if err != nil {
+				return ctrl.Result{}, err
+			}
+		}
 		if vpcTunnel.Status.NatGwDp == vpcTunnel.Spec.NatGwDp { // NatGwDp not change
 			podnext, err := r.getNatGwPod(vpcTunnel.Spec.NatGwDp) // find pod named Spec.NatGwDp
 			if err != nil {
@@ -313,11 +328,11 @@ func (r *VpcNatTunnelReconciler) handleCreateOrUpdate(ctx context.Context, vpcTu
 			if err != nil {
 				return ctrl.Result{}, err
 			}
-			err = r.execCommandInPod(podnext.Name, podnext.Namespace, "vpc-nat-gw", genDeleteTunnelCmd(vpcTunnel))
+			err = r.execCommandInPod(podnext.Name, podnext.Namespace, "vpc-nat-gw", r.genDeleteTunnelCmd(vpcTunnel))
 			if err != nil {
 				return ctrl.Result{}, err
 			}
-			err = r.execCommandInPod(podnext.Name, podnext.Namespace, "vpc-nat-gw", genCreateTunnelCmd(vpcTunnel))
+			err = r.execCommandInPod(podnext.Name, podnext.Namespace, "vpc-nat-gw", r.genCreateTunnelCmd(vpcTunnel))
 			if err != nil {
 				return ctrl.Result{}, err
 			}
@@ -342,7 +357,7 @@ func (r *VpcNatTunnelReconciler) handleCreateOrUpdate(ctx context.Context, vpcTu
 			if err != nil {
 				return ctrl.Result{}, err
 			}
-			err = r.execCommandInPod(podlast.Name, podlast.Namespace, "vpc-nat-gw", genDeleteTunnelCmd(vpcTunnel))
+			err = r.execCommandInPod(podlast.Name, podlast.Namespace, "vpc-nat-gw", r.genDeleteTunnelCmd(vpcTunnel))
 			if err != nil {
 				return ctrl.Result{}, err
 			}
@@ -374,7 +389,7 @@ func (r *VpcNatTunnelReconciler) handleCreateOrUpdate(ctx context.Context, vpcTu
 			}
 			vpcTunnel.Status.InternalIP = GwExternIP
 
-			err = r.execCommandInPod(podnext.Name, podnext.Namespace, "vpc-nat-gw", genCreateTunnelCmd(vpcTunnel))
+			err = r.execCommandInPod(podnext.Name, podnext.Namespace, "vpc-nat-gw", r.genCreateTunnelCmd(vpcTunnel))
 			if err != nil {
 				return ctrl.Result{}, err
 			}
@@ -404,7 +419,7 @@ func (r *VpcNatTunnelReconciler) handleDelete(ctx context.Context, vpcTunnel *ku
 		if err != nil {
 			return ctrl.Result{}, err
 		}
-		err = r.execCommandInPod(pod.Name, pod.Namespace, "vpc-nat-gw", genDeleteTunnelCmd(vpcTunnel))
+		err = r.execCommandInPod(pod.Name, pod.Namespace, "vpc-nat-gw", r.genDeleteTunnelCmd(vpcTunnel))
 		if err != nil {
 			return ctrl.Result{}, err
 		}

@@ -33,6 +33,7 @@ type VpcNatTunnelSpec struct {
 	RemoteIP      string `json:"remoteIp"`
 	InterfaceAddr string `json:"interfaceAddr"`
 	NatGwDp       string `json:"natGwDp"`
+	Type          string `json:"type"`
 
 	RemoteGlobalnetCIDR string `json:"remoteGlobalnetCIDR"`
 }
@@ -46,6 +47,7 @@ type VpcNatTunnelStatus struct {
 	RemoteIP      string `json:"remoteIp"`
 	InterfaceAddr string `json:"interfaceAddr"`
 	NatGwDp       string `json:"natGwDp"`
+	Type          string `json:"type"`
 
 	GlobalnetCIDR       string   `json:"globalnetCIDR"`
 	RemoteGlobalnetCIDR string   `json:"remoteGlobalnetCIDR"`
