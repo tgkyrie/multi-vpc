@@ -56,6 +56,7 @@ rules:
   verbs:
   - get
   - list
+  - watch
 - apiGroups:
   - submariner.io
   resources:
@@ -63,3 +64,4 @@ rules:
   verbs:
   - get
   - list
+  - watch
