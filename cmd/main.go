@@ -144,7 +144,7 @@ func main() {
 	}
 	//+kubebuilder:scaffold:builder
 
-	if err := mgr.Add(controller.New(mgr.GetClient(), mgr.GetConfig())); err != nil {
+	if err := mgr.Add(controller.NewInformer(mgr.GetClient(), mgr.GetConfig())); err != nil {
 		setupLog.Error(err, "unable to set up gateway informer")
 		os.Exit(1)
 	}

@@ -22,7 +22,7 @@ type GatewayInformer struct {
 	Config *rest.Config
 }
 
-func New(client client.Client, config *rest.Config) *GatewayInformer {
+func NewInformer(client client.Client, config *rest.Config) *GatewayInformer {
 	return &GatewayInformer{Client: client, Config: config}
 }
 
