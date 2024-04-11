@@ -574,7 +574,7 @@ spec:
         - --leader-elect
         command:
         - /manager
-        image: teriri152/multivpc:latest
+        image: shenzuzhenwang/multivpc:latest
         livenessProbe:
           httpGet:
             path: /healthz
