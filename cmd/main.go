@@ -19,13 +19,14 @@ package main
 import (
 	"crypto/tls"
 	"flag"
+	ovn "github.com/kubeovn/kube-ovn/pkg/apis/kubeovn/v1"
+	Submariner "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"os"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
-	Submariner "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -49,6 +50,8 @@ func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
 	utilruntime.Must(kubeovnv1.AddToScheme(scheme))
+
+	utilruntime.Must(ovn.AddToScheme(scheme))
 
 	utilruntime.Must(Submariner.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
@@ -125,6 +128,13 @@ func main() {
 		os.Exit(1)
 	}
 
+	if err = (&controller.VpcDnsForwardReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "VpcDnsForward")
+		os.Exit(1)
+	}
 	if err = (&controller.VpcNatTunnelReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
@@ -133,6 +143,11 @@ func main() {
 		os.Exit(1)
 	}
 	//+kubebuilder:scaffold:builder
+
+	if err := mgr.Add(controller.NewInformer(mgr.GetClient(), mgr.GetConfig())); err != nil {
+		setupLog.Error(err, "unable to set up gateway informer")
+		os.Exit(1)
+	}
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
 		setupLog.Error(err, "unable to set up health check")

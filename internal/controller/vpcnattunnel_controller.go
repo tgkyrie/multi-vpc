@@ -56,6 +56,7 @@ type VpcNatTunnelReconciler struct {
 //+kubebuilder:rbac:groups=core,resources=pods/exec,verbs=get;create
 //+kubebuilder:rbac:groups=submariner.io,resources=gateways,verbs=get;list;watch;
 //+kubebuilder:rbac:groups=submariner.io,resources=clusterglobalegressips,verbs=get;list;watch
+//+kubebuilder:rbac:groups=apps,resources=statefulsets,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
