@@ -12,7 +12,9 @@
 - Access to a Kubernetes v1.11.3+ cluster.
 
 ### 构建镜像
-**执行以下命令， `IMG`为构建的镜像名:**
+**当前推送到master分支会自动构建镜像，并推送到dockerhub: taowuyuan/multi-vpc:latest**
+
+**你也可以通过以下命令，手动构建和同岁镜像。（`IMG`为构建的镜像名）:**
 
 ```sh
 export IMG=teriri152/multivpc:latest
