@@ -235,13 +235,6 @@ func genDelGlobalnetRoute(GlobalnetCIDR string, ovnGwIP string, RemoteGlobalnetC
 	return InFlowRoute + ";" + OutFlowRoute + ";" + SNAT
 }
 
-// func genLastCreateTunnelCmd(tunnel *kubeovnv1.VpcNatTunnel) string {
-// 	createCmd := fmt.Sprintf("ip tunnel add %s mode gre remote %s local %s ttl 255", tunnel.Name, tunnel.Status.RemoteIP, tunnel.Status.InternalIP)
-// 	setUpCmd := fmt.Sprintf("ip link set %s up", tunnel.Name)
-// 	addrCmd := fmt.Sprintf("ip addr add %s dev %s", tunnel.Status.InterfaceAddr, tunnel.Name)
-// 	return createCmd + ";" + setUpCmd + ";" + addrCmd
-// }
-
 func genDeleteTunnelCmd(tunnel *kubeovnv1.VpcNatTunnel) string {
 	delCmd := fmt.Sprintf("ip tunnel del %s", tunnel.Name)
 	return delCmd
