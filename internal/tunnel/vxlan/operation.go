@@ -32,7 +32,7 @@ func (v *VxlanOperation) CreateCmd() string {
 }
 
 func (v *VxlanOperation) DeleteCmd() string {
-	delCmd := fmt.Sprintf("ip tunnel del %s", v.tunnel.Name)
+	delCmd := fmt.Sprintf("ip link del %s", v.tunnel.Name)
 	return delCmd
 }
 
