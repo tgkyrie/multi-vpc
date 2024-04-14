@@ -79,9 +79,9 @@ metadata:
   name: ovn-gre0
   namespace: ns1
 spec:
-  remoteIp: "10.10.0.21" #互联的对端vpc网关实体网络ip
-  interfaceAddr: "10.100.0.1/24" #隧道地址
-  natGwDp: "gw1" #vpc网关名字
+  remoteIp: "172.16.50.121" #互联的对端vpc网关实体网络ip
+  interfaceAddr: "10.0.0.1/24" #隧道地址
+  natGwDp: "vpc2-net1-gateway" #vpc网关名字，不要带"vpc-nat-gw-"
   type: "vxlan" #隧道类型，或"gre"
   remoteGlobalnetCIDR: "242.0.0.0/16"
 
