@@ -1,6 +1,7 @@
 # multi-vpc
-
-在kube-ovn vpc网关上自动创建和维护隧道的operator
+### operator 功能
+- 在kube-ovn vpc-dns deployment上自动创建和维护Dns转发
+- 在kube-ovn vpc网关上自动创建和维护隧道
 
 ## Getting Started
 
@@ -14,15 +15,13 @@
 ### 构建镜像
 **执行以下命令， `IMG`为docker仓库名:**
 
-将makefile中的IMG改为镜像地址
+**你也可以通过以下命令，手动构建和同岁镜像。（`IMG`为构建的镜像名）:**
 
 ```sh
 make docker-build docker-push  #到远程仓库
 ```
 
 ### 生成yaml文件
-
-更改了makefile中的deploy
 
 ```sh
 make deploy
@@ -38,20 +37,45 @@ make deploy
 kubectl apply -f deploy.yaml
 ```
 
-### 测试
+### 测试 DNS 转发
 
-新建tunnel.yaml
+新建 dns.yaml
+```yaml
+apiVersion: "kubeovn.ustc.io/v1"
+kind: VpcDnsForward
+metadata:
+  name: dns-1
+  namespace: ns1
+spec:
+  vpc: test-vpc-1
+
+```
+```sh
+kubectl apply -f dns.yaml
+```
+登陆vpc-dns deployment, 可以看到路由已经转发
+```sh
+kubectl delete -f dns.yaml
+```
+登陆vpc-dns deployment, 可以看到路由已被删除
+
+
+### 测试 网关隧道
+新建 tunnel.yaml
+
 ```yaml
 apiVersion: "kubeovn.ustc.io/v1"
 kind: VpcNatTunnel
 metadata:
   name: ovn-gre0
-  namespace: ns2
+  namespace: ns1
 spec:
-  remoteIp: "172.16.50.122" #互联的对端vpc网关实体网络ip
+  remoteIp: "172.16.50.121" #互联的对端vpc网关实体网络ip
   interfaceAddr: "10.0.0.1/24" #隧道地址
-  natGwDp: "vpc2-net1-gateway" #vpc网关名字
-  remoteGlobalnetCIDR: "242.0.0.0/16"	#对端集群的globalnet CIDR
+  natGwDp: "vpc2-net1-gateway" #vpc网关名字，不要带"vpc-nat-gw-"
+  type: "vxlan" #隧道类型，或"gre"
+  remoteGlobalnetCIDR: "242.0.0.0/16"
+
 ```
 ```sh
 kubectl apply -f tunnel.yaml
