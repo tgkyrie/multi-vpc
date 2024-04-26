@@ -33,7 +33,8 @@ type VpcNatTunnelSpec struct {
 	RemoteIP      string `json:"remoteIp"`
 	InterfaceAddr string `json:"interfaceAddr"`
 	NatGwDp       string `json:"natGwDp"`
-	Type          string `json:"type"`
+	// +kubebuilder:default="gre"
+	Type string `json:"type"`
 
 	RemoteGlobalnetCIDR string `json:"remoteGlobalnetCIDR"`
 }
