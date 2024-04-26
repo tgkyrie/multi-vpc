@@ -37,6 +37,13 @@ make deploy
 kubectl apply -f deploy.yaml
 ```
 
+以下即为部署成功：
+
+```sh
+sdn@server02:~$ kubectl get pod -A
+multi-vpc-system      multi-vpc-controller-manager-7cf6c6b9d6-q4sq5    2/2     Running            0               73s
+```
+
 ### 测试 DNS 转发
 
 新建 dns.yaml
@@ -54,10 +61,53 @@ spec:
 kubectl apply -f dns.yaml
 ```
 登陆vpc-dns deployment, 可以看到路由已经转发
+
+```sh
+sdn@server10:~$ kubectl describe deployment vpc-dns-test-dns1 -n kube-system
+Pod Template:
+  Labels:           k8s-app=vpc-dns-test-dns1
+  Annotations:      k8s.v1.cni.cncf.io/networks: default/ovn-nad
+                    ovn-nad.default.ovn.kubernetes.io/logical_switch: ovn-default
+                    ovn.kubernetes.io/logical_switch: vpc2-net1
+  Service Account:  vpc-dns
+  Init Containers:
+   init-route:
+    Image:      docker.io/kubeovn/vpc-nat-gateway:v1.12.8
+    Port:       <none>
+    Host Port:  <none>
+    Command:
+      sh
+      -c
+      ip -4 route add 10.96.0.1 via 10.244.0.1 dev net1;ip -4 route add 218.2.2.2 via 10.244.0.1 dev net1;ip -4 route add 114.114.114.114 via 10.244.0.1 dev net1;ip -4 route add 10.96.0.10 via 10.244.0.1 dev net1;
+```
+
+
+
 ```sh
 kubectl delete -f dns.yaml
 ```
 登陆vpc-dns deployment, 可以看到路由已被删除
+
+```sh
+sdn@server10:~$ kubectl describe deployment vpc-dns-test-dns1 -n kube-system
+Pod Template:
+  Labels:           k8s-app=vpc-dns-test-dns1
+  Annotations:      k8s.v1.cni.cncf.io/networks: default/ovn-nad
+                    ovn-nad.default.ovn.kubernetes.io/logical_switch: ovn-default
+                    ovn.kubernetes.io/logical_switch: vpc2-net1
+  Service Account:  vpc-dns
+  Init Containers:
+   init-route:
+    Image:      docker.io/kubeovn/vpc-nat-gateway:v1.12.8
+    Port:       <none>
+    Host Port:  <none>
+    Command:
+      sh
+      -c
+      ip -4 route add 10.96.0.1 via 10.244.0.1 dev net1;ip -4 route add 218.2.2.2 via 10.244.0.1 dev net1;ip -4 route add 114.114.114.114 via 10.244.0.1 dev net1;
+```
+
+
 
 
 ### 测试 网关隧道
@@ -75,19 +125,40 @@ spec:
   natGwDp: "vpc2-net1-gateway" #vpc网关名字，不要带"vpc-nat-gw-"
   type: "vxlan" #隧道类型，或"gre"
   remoteGlobalnetCIDR: "242.0.0.0/16"
-
 ```
 ```sh
 kubectl apply -f tunnel.yaml
 ```
 登陆vpc网关pod，可以观察到隧道创建
+
+```sh
+sdn@server10:~$ kubectl exec -it -n kube-system vpc-nat-gw-vpc2-net1-gateway-0 -- /bin/sh
+/kube-ovn # ifconfig
+ovn-gre0  Link encap:Ethernet  HWaddr 7E:9F:E9:59:81:01
+          inet addr:10.0.0.1  Bcast:0.0.0.0  Mask:255.255.255.0
+          inet6 addr: fe80::7c9f:e9ff:fe59:8101/64 Scope:Link
+          UP BROADCAST RUNNING MULTICAST  MTU:1450  Metric:1
+          RX packets:0 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:9 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:1000
+          RX bytes:0 (0.0 B)  TX bytes:600 (600.0 B)
+/kube-ovn # ip route
+10.0.0.0/24 dev ovn-gre0 proto kernel scope link src 10.0.0.1
+242.0.0.0/16 via 10.0.1.1 dev eth0
+242.1.0.0/16 dev ovn-gre0 scope link
+/kube-ovn # iptables -t nat -L POSTROUTING
+SNAT       all  --  anywhere             242.1.0.0/16         to:242.0.0.1-242.0.0.8
+```
+
+
+
 ```sh
 kubectl delete -f tunnel.yaml
 ```
-登陆vpc网关pod,可以观察到隧道被删除
+登陆vpc网关pod,可以观察到以上内容均被删除
 
 
 
 ## TODO
-+ Watch Vpc网关Pod的变更事件，维护隧道
++ Watch Vpc网关Pod的重启事件，维护隧道
 + ...
